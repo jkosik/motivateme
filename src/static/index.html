@@ -2,53 +2,201 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>MotivateMe · Ink Sepolia · Counter</title>
+  <title>MotivateMe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Ethers v6 (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
-    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
-    button { padding: 8px 12px; cursor: pointer; }
-    input { padding: 8px; width: 160px; }
-    code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
-    .muted { color: #666; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 480px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 40px;
+      color: #000;
+      letter-spacing: -0.5px;
+    }
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .info {
+      color: #6b7280;
+      font-size: 14px;
+      flex: 1;
+    }
+
+    .info.connected {
+      color: #10b981;
+      font-weight: 500;
+    }
+
+    button {
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-width: 140px;
+    }
+
+    button:hover {
+      background: #333;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      background: #e5e7eb;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    select {
+      background: #fff;
+      color: #1a1a1a;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-width: 140px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231a1a1a' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+
+    select:hover {
+      border-color: #9ca3af;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #000;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 15px;
+      transition: all 0.15s ease;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+
+    input[type="number"]:focus,
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #000;
+    }
+
+    .contract-info {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .contract-address {
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+      margin-top: 4px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 28px;
+      }
+      .row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      button, select {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>MotivateMe · Ink Sepolia · Counter</h1>
+  <div class="container">
+    <h1>MotivateMe</h1>
 
-  <div class="row">
-    <button id="connectBtn">Connect Wallet</button>
-    <span id="acct" class="muted">Not connected</span>
+    <div class="section">
+      <div class="row">
+        <button id="connectBtn">Connect wallet</button>
+        <div class="info" id="walletInfo">Not connected</div>
+      </div>
+    </div>
+
+    <div class="section" id="actionsSection" class="hidden">
+      <div class="row">
+        <input type="text" id="recipientInput" placeholder="Recipient address (0x...)" />
+      </div>
+      <div class="row">
+        <select id="functionSelect">
+          <option value="">Select Motivation</option>
+          <option value="read">Read counter</option>
+          <option value="increment">Increment +1</option>
+          <option value="set">Set value</option>
+        </select>
+        <div class="info" id="functionInfo">—</div>
+      </div>
+      <div id="setValueInput" class="hidden">
+        <input type="number" id="valueInput" placeholder="Enter value" />
+      </div>
+    </div>
+
+    <div class="contract-info">
+      <div>Contract address</div>
+      <div class="contract-address" id="contractAddr"></div>
+    </div>
   </div>
-
-  <div class="row">
-    <span>Network:</span>
-    <span id="net" class="muted">—</span>
-    <button id="switchBtn">Switch to Ink Sepolia</button>
-  </div>
-
-  <hr/>
-
-  <p>Contract: <code id="addr"></code></p>
-
-  <div class="row">
-    <button id="readBtn">Read number()</button>
-    <span>Value:</span> <code id="val">—</code>
-  </div>
-
-  <div class="row">
-    <button id="incBtn">increment()</button>
-    <span class="muted">Sends a tx; needs a little ETH on Ink Sepolia for gas.</span>
-  </div>
-
-  <div class="row">
-    <input id="setInput" type="number" placeholder="enter new value"/>
-    <button id="setBtn">setNumber(value)</button>
-  </div>
-
-  <p id="status" class="muted"></p>
 
   <script>
     // ---- CONFIG ----
@@ -85,13 +233,42 @@
     let provider, signer, contract;
 
     const $ = (id) => document.getElementById(id);
-    const setStatus = (msg) => { $('status').textContent = msg || ''; };
 
-    $('addr').textContent = CONTRACT_ADDRESS;
+    $('contractAddr').textContent = CONTRACT_ADDRESS;
+
+    function setWalletInfo(msg, connected = false) {
+      const el = $('walletInfo');
+      el.textContent = msg;
+      if (connected) {
+        el.classList.add('connected');
+      } else {
+        el.classList.remove('connected');
+      }
+    }
+
+    function setFunctionInfo(msg) {
+      $('functionInfo').textContent = msg;
+    }
+
+    function showActionsSection(show) {
+      if (show) {
+        $('actionsSection').classList.remove('hidden');
+      } else {
+        $('actionsSection').classList.add('hidden');
+      }
+    }
+
+    function getRecipientAddress() {
+      return $('recipientInput').value.trim();
+    }
+
+    function isValidAddress(address) {
+      return address && /^0x[a-fA-F0-9]{40}$/.test(address);
+    }
 
     function haveProvider() {
       if (!window.ethereum) {
-        setStatus('No injected wallet found. Please install MetaMask/Rabby/Frame.');
+        setFunctionInfo('No wallet detected');
         return false;
       }
       return true;
@@ -124,79 +301,122 @@
       signer = await provider.getSigner();
       contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       const acct = await signer.getAddress();
-      $('acct').textContent = acct;
       const net = await provider.getNetwork();
-      $('net').textContent = `${net.name || 'Ink Sepolia'} (chainId: ${Number(net.chainId)})`;
+
+      setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${net.name || 'Ink Sepolia'}`, true);
+      showActionsSection(true);
     }
 
+    // Connect wallet button
     $('connectBtn').onclick = async () => {
       try {
         if (!haveProvider()) return;
+        setWalletInfo('Connecting...');
         await window.ethereum.request({ method: 'eth_requestAccounts' });
         await ensureInkSepolia();
         await initProviderAndContract();
-        setStatus('Connected.');
+        setFunctionInfo('Connected');
       } catch (e) {
         console.error(e);
-        setStatus(`Connect error: ${e.message || e}`);
+        setWalletInfo('Connection failed');
+        setFunctionInfo(e.message || 'Connection failed');
       }
     };
 
-    $('switchBtn').onclick = async () => {
-      try {
-        if (!haveProvider()) return;
-        await ensureInkSepolia();
-        await initProviderAndContract();
-        setStatus('Switched to Ink Sepolia.');
-      } catch (e) {
-        console.error(e);
-        setStatus(`Switch error: ${e.message || e}`);
+    // Function dropdown
+    $('functionSelect').onchange = async (e) => {
+      const val = e.target.value;
+
+      // Reset
+      $('setValueInput').classList.add('hidden');
+
+      if (!val) {
+        setFunctionInfo('—');
+        return;
+      }
+
+      if (!contract) {
+        setFunctionInfo('Please connect wallet first');
+        e.target.value = '';
+        return;
+      }
+
+      // Handle different functions
+      if (val === 'read') {
+        await readCounter();
+      } else if (val === 'increment') {
+        await incrementCounter();
+      } else if (val === 'set') {
+        $('setValueInput').classList.remove('hidden');
+        setFunctionInfo('Enter value and press Enter');
+      }
+
+      // Reset dropdown
+      e.target.value = '';
+    };
+
+    // Set value input
+    $('valueInput').onkeypress = async (e) => {
+      if (e.key === 'Enter') {
+        await setCounter();
       }
     };
 
-    $('readBtn').onclick = async () => {
+    async function readCounter() {
       try {
-        if (!contract) await $('connectBtn').onclick();
+        setFunctionInfo('Reading...');
         const v = await contract.number();
-        $('val').textContent = v.toString();
-        setStatus('Read OK.');
+        setFunctionInfo(`Current value: ${v.toString()}`);
       } catch (e) {
         console.error(e);
-        setStatus(`Read error: ${e.message || e}`);
+        setFunctionInfo(`Error: ${e.message || 'Read failed'}`);
       }
-    };
+    }
 
-    $('incBtn').onclick = async () => {
+    async function incrementCounter() {
       try {
-        if (!contract) await $('connectBtn').onclick();
-        setStatus('Sending increment()...');
+        // Get recipient address if needed for your contract functions
+        const recipient = getRecipientAddress();
+
+        // Example: validate if your function requires a recipient
+        // if (!isValidAddress(recipient)) {
+        //   setFunctionInfo('Please enter a valid recipient address');
+        //   return;
+        // }
+
+        setFunctionInfo('Sending transaction...');
         const tx = await contract.increment();
-        setStatus(`Pending: ${tx.hash}`);
+        // If your contract function needs recipient: await contract.yourFunction(recipient)
+        setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
         const rec = await tx.wait();
-        setStatus(`Mined in block ${rec.blockNumber}.`);
-        $('readBtn').click();
+        setFunctionInfo(`Confirmed in block ${rec.blockNumber}`);
+        setTimeout(() => readCounter(), 1000);
       } catch (e) {
         console.error(e);
-        setStatus(`Tx error: ${e.message || e}`);
+        setFunctionInfo(`Error: ${e.message || 'Transaction failed'}`);
       }
-    };
+    }
 
-    $('setBtn').onclick = async () => {
+    async function setCounter() {
       try {
-        const val = $('setInput').value;
-        if (!val) return setStatus('Enter a value.');
-        if (!contract) await $('connectBtn').onclick();
-        setStatus(`Sending setNumber(${val})...`);
+        const val = $('valueInput').value;
+        if (!val) {
+          setFunctionInfo('Please enter a value');
+          return;
+        }
+        setFunctionInfo(`Setting to ${val}...`);
         const tx = await contract.setNumber(BigInt(val));
-        setStatus(`Pending: ${tx.hash}`);
+        setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
         const rec = await tx.wait();
-        setStatus(`Mined in block ${rec.blockNumber}.`);
-        $('readBtn').click();
+        setFunctionInfo(`Set to ${val} in block ${rec.blockNumber}`);
+        $('valueInput').value = '';
+        $('setValueInput').classList.add('hidden');
+        setTimeout(() => readCounter(), 1000);
       } catch (e) {
         console.error(e);
-        setStatus(`Tx error: ${e.message || e}`);
+        setFunctionInfo(`Error: ${e.message || 'Transaction failed'}`);
       }
-    };
+    }
 
     // Auto-update UI if chain/account changes
     if (window.ethereum) {

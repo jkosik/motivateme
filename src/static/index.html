@@ -52,13 +52,23 @@
 
   <script>
     // ---- CONFIG ----
+    // Testnet Configuration (Ink Sepolia)
     const INK_SEPOLIA = {
-      chainId: '0x2b84',                      // 11124 in hex
+      chainId: '0xba5ed',                     // 763373 in hex
       chainName: 'Ink Sepolia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-      rpcUrls: ['https://ink-sepolia.drpc.org'],
+      rpcUrls: ['https://rpc-gel-sepolia.inkonchain.com'],
       blockExplorerUrls: ['https://explorer-sepolia.inkonchain.com']
     };
+
+    // Mainnet Configuration (Ink) - COMMENTED OUT
+    // const INK_MAINNET = {
+    //   chainId: '0xdf11',                    // 57073 in hex
+    //   chainName: 'Ink',
+    //   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    //   rpcUrls: ['https://rpc-gel.inkonchain.com'],
+    //   blockExplorerUrls: ['https://explorer.inkonchain.com']
+    // };
 
     const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
 

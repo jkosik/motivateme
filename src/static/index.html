@@ -142,6 +142,14 @@
       font-family: 'Courier New', monospace;
       word-break: break-all;
       margin-top: 4px;
+      color: #667eea;
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+
+    .contract-address:hover {
+      color: #5568d3;
+      text-decoration: underline;
     }
 
     .hidden {
@@ -194,7 +202,7 @@
 
     <div class="contract-info">
       <div>Contract address</div>
-      <div class="contract-address" id="contractAddr"></div>
+      <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
     </div>
   </div>
 
@@ -203,20 +211,25 @@
     // Testnet Configuration (Ink Sepolia)
     const INK_SEPOLIA = {
       chainId: '0xba5ed',                     // 763373 in hex
+      chainIdDecimal: 763373,
       chainName: 'Ink Sepolia',
       nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
       rpcUrls: ['https://rpc-gel-sepolia.inkonchain.com'],
       blockExplorerUrls: ['https://explorer-sepolia.inkonchain.com']
     };
 
-    // Mainnet Configuration (Ink) - COMMENTED OUT
-    // const INK_MAINNET = {
-    //   chainId: '0xdf11',                    // 57073 in hex
-    //   chainName: 'Ink',
-    //   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    //   rpcUrls: ['https://rpc-gel.inkonchain.com'],
-    //   blockExplorerUrls: ['https://explorer.inkonchain.com']
-    // };
+    // Mainnet Configuration (Ink)
+    const INK_MAINNET = {
+      chainId: '0xdf11',                      // 57073 in hex
+      chainIdDecimal: 57073,
+      chainName: 'Ink',
+      nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      rpcUrls: ['https://rpc-gel.inkonchain.com'],
+      blockExplorerUrls: ['https://explorer.inkonchain.com']
+    };
+
+    // *** SELECT ACTIVE NETWORK HERE ***
+    const ACTIVE_NETWORK = INK_SEPOLIA;  // Change to INK_MAINNET for mainnet
 
     const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
 
@@ -234,7 +247,13 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // Set contract address with link to block explorer
+    const explorerUrl = `${ACTIVE_NETWORK.blockExplorerUrls[0]}/address/${CONTRACT_ADDRESS}`;
     $('contractAddr').textContent = CONTRACT_ADDRESS;
+    $('contractAddr').href = explorerUrl;
+
+    // Update page title with active network
+    document.title = `MotivateMe · ${ACTIVE_NETWORK.chainName}`;
 
     function setWalletInfo(msg, connected = false) {
       const el = $('walletInfo');
@@ -274,20 +293,20 @@
       return true;
     }
 
-    async function ensureInkSepolia() {
+    async function ensureCorrectNetwork() {
       const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainIdHex.toLowerCase() !== INK_SEPOLIA.chainId) {
+      if (chainIdHex.toLowerCase() !== ACTIVE_NETWORK.chainId) {
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: INK_SEPOLIA.chainId }],
+            params: [{ chainId: ACTIVE_NETWORK.chainId }],
           });
         } catch (err) {
           // If the chain is not added, add it
           if (err.code === 4902 || (err.data && err.data.originalError && err.data.originalError.code === 4902)) {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
-              params: [INK_SEPOLIA],
+              params: [ACTIVE_NETWORK],
             });
           } else {
             throw err;
@@ -303,7 +322,15 @@
       const acct = await signer.getAddress();
       const net = await provider.getNetwork();
 
-      setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${net.name || 'Ink Sepolia'}`, true);
+      // Use network name from active config
+      let networkName = ACTIVE_NETWORK.chainName;
+
+      // Verify we're on the correct chain
+      if (Number(net.chainId) !== ACTIVE_NETWORK.chainIdDecimal) {
+        networkName = `Wrong network (${Number(net.chainId)})`;
+      }
+
+      setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
       showActionsSection(true);
     }
 
@@ -313,7 +340,7 @@
         if (!haveProvider()) return;
         setWalletInfo('Connecting...');
         await window.ethereum.request({ method: 'eth_requestAccounts' });
-        await ensureInkSepolia();
+        await ensureCorrectNetwork();
         await initProviderAndContract();
         setFunctionInfo('Connected');
       } catch (e) {

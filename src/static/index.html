@@ -5,6 +5,8 @@
   <title>MotivateMe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -156,6 +158,136 @@
       display: none;
     }
 
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 420px;
+      width: 100%;
+      position: relative;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #9ca3af;
+      cursor: pointer;
+      padding: 4px 8px;
+      min-width: auto;
+    }
+
+    .modal-close:hover {
+      color: #000;
+      background: none;
+      transform: none;
+    }
+
+    .wallet-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wallet-option {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: white;
+      text-align: left;
+    }
+
+    .wallet-option:hover {
+      border-color: #667eea;
+      background: #f8f9fa;
+      transform: none;
+    }
+
+    .wallet-option-icon {
+      font-size: 24px;
+      margin-right: 12px;
+    }
+
+    .wallet-option-text {
+      flex: 1;
+    }
+
+    .wallet-option-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+
+    .wallet-option-desc {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #qrcode {
+      padding: 12px;
+      background: white;
+      border-radius: 12px;
+      border: 2px solid #e5e7eb;
+      display: inline-block;
+    }
+
+    #qrcode img,
+    #qrcode canvas {
+      display: block;
+      border-radius: 8px;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+    }
+
+    .qr-instructions {
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .qr-timer {
+      font-size: 13px;
+      color: #9ca3af;
+      text-align: center;
+    }
+
     @media (max-width: 640px) {
       h1 {
         font-size: 28px;
@@ -182,7 +314,7 @@
       </div>
     </div>
 
-    <div class="section" id="actionsSection" class="hidden">
+    <div class="section hidden" id="actionsSection">
       <div class="row">
         <input type="text" id="recipientInput" placeholder="Recipient address (0x...)" />
       </div>
@@ -203,6 +335,14 @@
     <div class="contract-info">
       <div>Contract address</div>
       <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
+    </div>
+  </div>
+
+  <!-- Connection Modal -->
+  <div id="connectModal" class="modal-overlay hidden" style="display: none;">
+    <div class="modal">
+      <button class="modal-close" id="modalCloseBtn">×</button>
+      <div id="modalContent"></div>
     </div>
   </div>
 
@@ -243,7 +383,8 @@
     ];
 
     // ---- STATE ----
-    let provider, signer, contract;
+    let provider, signer, contract, wcProvider;
+    let qrExpiryTimer;
 
     const $ = (id) => document.getElementById(id);
 
@@ -283,6 +424,79 @@
 
     function isValidAddress(address) {
       return address && /^0x[a-fA-F0-9]{40}$/.test(address);
+    }
+
+    // ---- MODAL FUNCTIONS ----
+    function closeConnectModal() {
+      const modal = $('connectModal');
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+      if (qrExpiryTimer) clearInterval(qrExpiryTimer);
+    }
+
+    function openModal() {
+      const modal = $('connectModal');
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+
+    function showConnectOptions() {
+      const hasBrowserWallet = typeof window.ethereum !== 'undefined';
+
+      const modalContent = $('modalContent');
+      modalContent.innerHTML = `
+        <div class="modal-title">Connect Wallet</div>
+        <div class="wallet-options">
+          ${hasBrowserWallet ? `
+            <div class="wallet-option" onclick="connectBrowserWallet()">
+              <div class="wallet-option-icon">🦊</div>
+              <div class="wallet-option-text">
+                <div class="wallet-option-title">Browser Extension</div>
+                <div class="wallet-option-desc">MetaMask, Coinbase, Rabby</div>
+              </div>
+            </div>
+          ` : `
+            <div class="wallet-option" style="opacity: 0.5; cursor: not-allowed; border-style: dashed;">
+              <div class="wallet-option-icon">🦊</div>
+              <div class="wallet-option-text">
+                <div class="wallet-option-title">Browser Extension</div>
+                <div class="wallet-option-desc">No wallet detected - Install MetaMask</div>
+              </div>
+            </div>
+          `}
+          <div class="wallet-option" onclick="showQRCode()">
+            <div class="wallet-option-icon">📱</div>
+            <div class="wallet-option-text">
+              <div class="wallet-option-title">Mobile Wallet</div>
+              <div class="wallet-option-desc">Scan QR with Kraken, Trust, Rainbow</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      openModal();
+    }
+
+    async function showQRCode() {
+      const modalContent = $('modalContent');
+      modalContent.innerHTML = `
+        <div class="modal-title">Scan with Mobile Wallet</div>
+        <div class="qr-container">
+          <div id="qrcode"></div>
+          <div class="qr-instructions">
+            Open your wallet app and scan this QR code
+          </div>
+          <div class="qr-timer" id="qrTimer">Connecting...</div>
+        </div>
+      `;
+
+      try {
+        await connectWalletConnect();
+      } catch (e) {
+        console.error(e);
+        setFunctionInfo(`Connection failed: ${e.message || e}`);
+        closeConnectModal();
+      }
     }
 
     function haveProvider() {
@@ -334,9 +548,10 @@
       showActionsSection(true);
     }
 
-    // Connect wallet button
-    $('connectBtn').onclick = async () => {
+    // ---- WALLET CONNECTION FUNCTIONS ----
+    async function connectBrowserWallet() {
       try {
+        closeConnectModal();
         if (!haveProvider()) return;
         setWalletInfo('Connecting...');
         await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -348,6 +563,103 @@
         setWalletInfo('Connection failed');
         setFunctionInfo(e.message || 'Connection failed');
       }
+    }
+
+    async function connectWalletConnect() {
+      try {
+        console.log('Initializing WalletConnect...');
+
+        // Check if WalletConnect library is loaded
+        if (typeof WalletConnectProvider === 'undefined') {
+          throw new Error('WalletConnect library not loaded');
+        }
+
+        // Initialize WalletConnect provider
+        wcProvider = new WalletConnectProvider.default({
+          rpc: {
+            [ACTIVE_NETWORK.chainIdDecimal]: ACTIVE_NETWORK.rpcUrls[0]
+          },
+          chainId: ACTIVE_NETWORK.chainIdDecimal,
+          qrcode: false // We'll handle QR ourselves
+        });
+
+        console.log('WalletConnect provider created');
+
+        // Display QR code
+        wcProvider.connector.on('display_uri', (err, payload) => {
+          console.log('QR URI received:', payload);
+          const uri = payload.params[0];
+
+          // Check if QRCode library is loaded
+          if (typeof QRCode === 'undefined') {
+            console.error('QRCode library not loaded');
+            $('qrTimer').textContent = 'Error: QR library not loaded';
+            return;
+          }
+
+          // Clear previous QR code if exists
+          const qrContainer = document.getElementById('qrcode');
+          qrContainer.innerHTML = '';
+
+          // Generate QR code
+          try {
+            new QRCode(qrContainer, {
+              text: uri,
+              width: 200,
+              height: 200,
+              colorDark: '#000000',
+              colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.H
+            });
+            console.log('QR code displayed successfully');
+          } catch (error) {
+            console.error('QR Code generation error:', error);
+            $('qrTimer').textContent = 'Error generating QR code';
+          }
+
+          // Set expiry timer (5 minutes)
+          let secondsLeft = 300;
+          qrExpiryTimer = setInterval(() => {
+            secondsLeft--;
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            $('qrTimer').textContent = `Expires in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            if (secondsLeft <= 0) {
+              clearInterval(qrExpiryTimer);
+              closeConnectModal();
+            }
+          }, 1000);
+        });
+
+        console.log('Enabling WalletConnect...');
+        // Enable WalletConnect
+        await wcProvider.enable();
+
+        // Initialize provider and contract
+        provider = new ethers.BrowserProvider(wcProvider);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        const acct = await signer.getAddress();
+        const net = await provider.getNetwork();
+
+        let networkName = ACTIVE_NETWORK.chainName;
+        if (Number(net.chainId) !== ACTIVE_NETWORK.chainIdDecimal) {
+          networkName = `Wrong network (${Number(net.chainId)})`;
+        }
+
+        setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
+        showActionsSection(true);
+        setFunctionInfo('Connected');
+        closeConnectModal();
+      } catch (e) {
+        console.error(e);
+        throw e;
+      }
+    }
+
+    // Connect wallet button - show modal
+    $('connectBtn').onclick = () => {
+      showConnectOptions();
     };
 
     // Function dropdown
@@ -450,6 +762,19 @@
       window.ethereum.on?.('chainChanged', () => location.reload());
       window.ethereum.on?.('accountsChanged', () => location.reload());
     }
+
+    // Close modal on overlay click
+    $('connectModal').onclick = (e) => {
+      if (e.target.id === 'connectModal') {
+        closeConnectModal();
+      }
+    };
+
+    // Close modal on X button click
+    $('modalCloseBtn').onclick = (e) => {
+      e.stopPropagation();
+      closeConnectModal();
+    };
   </script>
 </body>
 </html>

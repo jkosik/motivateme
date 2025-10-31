@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MotivateMe · Ink Sepolia · Counter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Ethers v6 (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha512-df6o6Xk8oYvT5SpP4d0dC3P/kcS8mXlX6bFq4de+0gG9qvWw1V6b0t2p5Q7aJYFWWT1gBq1v+qGmYp7mI0D4Gg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+    button { padding: 8px 12px; cursor: pointer; }
+    input { padding: 8px; width: 160px; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>MotivateMe · Ink Sepolia · Counter</h1>
+
+  <div class="row">
+    <button id="connectBtn">Connect Wallet</button>
+    <span id="acct" class="muted">Not connected</span>
+  </div>
+
+  <div class="row">
+    <span>Network:</span>
+    <span id="net" class="muted">—</span>
+    <button id="switchBtn">Switch to Ink Sepolia</button>
+  </div>
+
+  <hr/>
+
+  <p>Contract: <code id="addr"></code></p>
+
+  <div class="row">
+    <button id="readBtn">Read number()</button>
+    <span>Value:</span> <code id="val">—</code>
+  </div>
+
+  <div class="row">
+    <button id="incBtn">increment()</button>
+    <span class="muted">Sends a tx; needs a little ETH on Ink Sepolia for gas.</span>
+  </div>
+
+  <div class="row">
+    <input id="setInput" type="number" placeholder="enter new value"/>
+    <button id="setBtn">setNumber(value)</button>
+  </div>
+
+  <p id="status" class="muted"></p>
+
+  <script>
+    // ---- CONFIG ----
+    const INK_SEPOLIA = {
+      chainId: '0x2b84',                      // 11124 in hex
+      chainName: 'Ink Sepolia',
+      nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      rpcUrls: ['https://ink-sepolia.drpc.org'],
+      blockExplorerUrls: ['https://explorer-sepolia.inkonchain.com']
+    };
+
+    const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
+
+    // Minimal ABI for Counter
+    const ABI = [
+      { "inputs": [], "name": "increment", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+      { "inputs": [ { "internalType": "uint256", "name": "newNumber", "type": "uint256" } ],
+        "name": "setNumber", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+      { "inputs": [], "name": "number", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+        "stateMutability": "view", "type": "function" }
+    ];
+
+    // ---- STATE ----
+    let provider, signer, contract;
+
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (msg) => { $('status').textContent = msg || ''; };
+
+    $('addr').textContent = CONTRACT_ADDRESS;
+
+    function haveProvider() {
+      if (!window.ethereum) {
+        setStatus('No injected wallet found. Please install MetaMask/Rabby/Frame.');
+        return false;
+      }
+      return true;
+    }
+
+    async function ensureInkSepolia() {
+      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainIdHex.toLowerCase() !== INK_SEPOLIA.chainId) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: INK_SEPOLIA.chainId }],
+          });
+        } catch (err) {
+          // If the chain is not added, add it
+          if (err.code === 4902 || (err.data && err.data.originalError && err.data.originalError.code === 4902)) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [INK_SEPOLIA],
+            });
+          } else {
+            throw err;
+          }
+        }
+      }
+    }
+
+    async function initProviderAndContract() {
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const acct = await signer.getAddress();
+      $('acct').textContent = acct;
+      const net = await provider.getNetwork();
+      $('net').textContent = `${net.name || 'Ink Sepolia'} (chainId: ${Number(net.chainId)})`;
+    }
+
+    $('connectBtn').onclick = async () => {
+      try {
+        if (!haveProvider()) return;
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        await ensureInkSepolia();
+        await initProviderAndContract();
+        setStatus('Connected.');
+      } catch (e) {
+        console.error(e);
+        setStatus(`Connect error: ${e.message || e}`);
+      }
+    };
+
+    $('switchBtn').onclick = async () => {
+      try {
+        if (!haveProvider()) return;
+        await ensureInkSepolia();
+        await initProviderAndContract();
+        setStatus('Switched to Ink Sepolia.');
+      } catch (e) {
+        console.error(e);
+        setStatus(`Switch error: ${e.message || e}`);
+      }
+    };
+
+    $('readBtn').onclick = async () => {
+      try {
+        if (!contract) await $('connectBtn').onclick();
+        const v = await contract.number();
+        $('val').textContent = v.toString();
+        setStatus('Read OK.');
+      } catch (e) {
+        console.error(e);
+        setStatus(`Read error: ${e.message || e}`);
+      }
+    };
+
+    $('incBtn').onclick = async () => {
+      try {
+        if (!contract) await $('connectBtn').onclick();
+        setStatus('Sending increment()...');
+        const tx = await contract.increment();
+        setStatus(`Pending: ${tx.hash}`);
+        const rec = await tx.wait();
+        setStatus(`Mined in block ${rec.blockNumber}.`);
+        $('readBtn').click();
+      } catch (e) {
+        console.error(e);
+        setStatus(`Tx error: ${e.message || e}`);
+      }
+    };
+
+    $('setBtn').onclick = async () => {
+      try {
+        const val = $('setInput').value;
+        if (!val) return setStatus('Enter a value.');
+        if (!contract) await $('connectBtn').onclick();
+        setStatus(`Sending setNumber(${val})...`);
+        const tx = await contract.setNumber(BigInt(val));
+        setStatus(`Pending: ${tx.hash}`);
+        const rec = await tx.wait();
+        setStatus(`Mined in block ${rec.blockNumber}.`);
+        $('readBtn').click();
+      } catch (e) {
+        console.error(e);
+        setStatus(`Tx error: ${e.message || e}`);
+      }
+    };
+
+    // Auto-update UI if chain/account changes
+    if (window.ethereum) {
+      window.ethereum.on?.('chainChanged', () => location.reload());
+      window.ethereum.on?.('accountsChanged', () => location.reload());
+    }
+  </script>
+</body>
+</html>

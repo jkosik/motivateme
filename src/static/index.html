@@ -5,8 +5,17 @@
   <title>MotivateMe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <!-- WalletConnect v2 Standalone Bundle -->
+  <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.13.0/dist/index.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    // The UMD bundle should expose WalletConnectProvider globally
+    console.log('Checking for WalletConnect globals:', {
+      WalletConnectProvider: typeof window.WalletConnectProvider,
+      ethereum: typeof window.ethereum,
+      allGlobals: Object.keys(window).filter(k => k.toLowerCase().includes('wallet'))
+    });
+  </script>
   <style>
     * {
       margin: 0;
@@ -260,7 +269,7 @@
     }
 
     #qrcode {
-      padding: 12px;
+      padding: 20px;
       background: white;
       border-radius: 12px;
       border: 2px solid #e5e7eb;
@@ -270,7 +279,6 @@
     #qrcode img,
     #qrcode canvas {
       display: block;
-      border-radius: 8px;
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
       image-rendering: pixelated;
@@ -372,6 +380,9 @@
     const ACTIVE_NETWORK = INK_SEPOLIA;  // Change to INK_MAINNET for mainnet
 
     const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
+
+    // WalletConnect v2 Project ID
+    const WALLETCONNECT_PROJECT_ID = 'd608436759f83467578a0fda722d7542';
 
     // Minimal ABI for Counter
     const ABI = [
@@ -486,16 +497,18 @@
           <div class="qr-instructions">
             Open your wallet app and scan this QR code
           </div>
-          <div class="qr-timer" id="qrTimer">Connecting...</div>
+          <div class="qr-timer" id="qrTimer">Initializing...</div>
         </div>
       `;
 
       try {
         await connectWalletConnect();
       } catch (e) {
-        console.error(e);
+        console.error('Connection error:', e);
+        $('qrTimer').textContent = `Error: ${e.message || 'Connection failed'}`;
+        $('qrTimer').style.color = '#991b1b';
         setFunctionInfo(`Connection failed: ${e.message || e}`);
-        closeConnectModal();
+        // Don't close modal so user can see the error
       }
     }
 
@@ -567,57 +580,71 @@
 
     async function connectWalletConnect() {
       try {
-        console.log('Initializing WalletConnect...');
+        console.log('Step 1: Checking for WalletConnect library...');
+        console.log('window.WalletConnectProvider:', window.WalletConnectProvider);
+        console.log('window.EthereumProvider:', window.EthereumProvider);
 
-        // Check if WalletConnect library is loaded
-        if (typeof WalletConnectProvider === 'undefined') {
-          throw new Error('WalletConnect library not loaded');
+        // The UMD bundle might expose it under different names
+        const EthereumProvider = window.WalletConnectProvider?.EthereumProvider ||
+                                  window.EthereumProvider ||
+                                  window['@walletconnect/ethereum-provider'];
+
+        if (!EthereumProvider) {
+          console.error('❌ No WalletConnect provider found!');
+          console.log('Available window properties:', Object.keys(window).slice(0, 50));
+          throw new Error('WalletConnect library not found. The CDN might be blocked or the library failed to load.');
         }
 
-        // Initialize WalletConnect provider
-        wcProvider = new WalletConnectProvider.default({
-          rpc: {
-            [ACTIVE_NETWORK.chainIdDecimal]: ACTIVE_NETWORK.rpcUrls[0]
-          },
+        console.log('Step 2: EthereumProvider found!', EthereumProvider);
+        $('qrTimer').textContent = 'Initializing WalletConnect...';
+
+        console.log('Step 3: Creating provider with config:', {
+          projectId: WALLETCONNECT_PROJECT_ID,
           chainId: ACTIVE_NETWORK.chainIdDecimal,
-          qrcode: false // We'll handle QR ourselves
+          rpc: ACTIVE_NETWORK.rpcUrls[0]
         });
 
-        console.log('WalletConnect provider created');
-
-        // Display QR code
-        wcProvider.connector.on('display_uri', (err, payload) => {
-          console.log('QR URI received:', payload);
-          const uri = payload.params[0];
-
-          // Check if QRCode library is loaded
-          if (typeof QRCode === 'undefined') {
-            console.error('QRCode library not loaded');
-            $('qrTimer').textContent = 'Error: QR library not loaded';
-            return;
+        // Initialize WalletConnect v2 provider
+        wcProvider = await EthereumProvider.init({
+          projectId: WALLETCONNECT_PROJECT_ID,
+          chains: [ACTIVE_NETWORK.chainIdDecimal],
+          optionalChains: [ACTIVE_NETWORK.chainIdDecimal],
+          rpcMap: {
+            [ACTIVE_NETWORK.chainIdDecimal]: ACTIVE_NETWORK.rpcUrls[0]
+          },
+          showQrModal: false,
+          metadata: {
+            name: 'MotivateMe',
+            description: 'MotivateMe Counter dApp',
+            url: window.location.origin,
+            icons: ['https://walletconnect.com/walletconnect-logo.png']
           }
+        });
 
-          // Clear previous QR code if exists
+        console.log('Step 4: Provider created successfully!', wcProvider);
+        $('qrTimer').textContent = 'Waiting for QR code...';
+
+        // Display QR code when URI is available
+        wcProvider.on('display_uri', (uri) => {
+          console.log('Step 5: QR URI received!', uri);
+
+          // Clear previous QR code
           const qrContainer = document.getElementById('qrcode');
           qrContainer.innerHTML = '';
 
           // Generate QR code
-          try {
-            new QRCode(qrContainer, {
-              text: uri,
-              width: 200,
-              height: 200,
-              colorDark: '#000000',
-              colorLight: '#ffffff',
-              correctLevel: QRCode.CorrectLevel.H
-            });
-            console.log('QR code displayed successfully');
-          } catch (error) {
-            console.error('QR Code generation error:', error);
-            $('qrTimer').textContent = 'Error generating QR code';
-          }
+          new QRCode(qrContainer, {
+            text: uri,
+            width: 200,
+            height: 200,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+          });
 
-          // Set expiry timer (5 minutes)
+          console.log('Step 6: QR code displayed!');
+
+          // Set expiry timer
           let secondsLeft = 300;
           qrExpiryTimer = setInterval(() => {
             secondsLeft--;
@@ -631,9 +658,10 @@
           }, 1000);
         });
 
-        console.log('Enabling WalletConnect...');
-        // Enable WalletConnect
+        console.log('Step 7: Enabling WalletConnect...');
         await wcProvider.enable();
+
+        console.log('Step 8: Connected! Initializing ethers provider...');
 
         // Initialize provider and contract
         provider = new ethers.BrowserProvider(wcProvider);
@@ -651,8 +679,12 @@
         showActionsSection(true);
         setFunctionInfo('Connected');
         closeConnectModal();
+
+        console.log('Step 9: All done!');
       } catch (e) {
-        console.error(e);
+        console.error('❌ WalletConnect error at some step:', e);
+        $('qrTimer').textContent = `Error: ${e.message}`;
+        $('qrTimer').style.color = '#991b1b';
         throw e;
       }
     }
@@ -762,6 +794,12 @@
       window.ethereum.on?.('chainChanged', () => location.reload());
       window.ethereum.on?.('accountsChanged', () => location.reload());
     }
+
+    // Handle WalletConnect disconnection
+    window.addEventListener('walletconnect_disconnect', () => {
+      console.log('WalletConnect disconnected');
+      location.reload();
+    });
 
     // Close modal on overlay click
     $('connectModal').onclick = (e) => {

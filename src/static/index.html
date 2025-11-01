@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>MotivateMe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik+Dirt&display=swap" rel="stylesheet">
   <script type="module" src="./app.js"></script>
   <style>
     * {
@@ -18,10 +21,26 @@
       color: #1a1a1a;
       min-height: 100vh;
       display: flex;
+      line-height: 1.6;
+      overflow: hidden;
+    }
+
+    .page-wrapper {
+      display: flex;
+      width: 100%;
+      transition: margin-right 0.3s ease;
+    }
+
+    .page-wrapper.help-open {
+      margin-right: 600px;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      line-height: 1.6;
     }
 
     .container {
@@ -29,12 +48,114 @@
       width: 100%;
     }
 
+    .help-panel {
+      position: fixed;
+      right: -600px;
+      top: 0;
+      width: 600px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+      transition: right 0.3s ease;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    .help-panel.open {
+      right: 0;
+    }
+
+    .help-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 28px;
+      font-weight: 300;
+      color: #666;
+      cursor: pointer;
+      background: none !important;
+      border: none;
+      padding: 0;
+      width: auto;
+      height: auto;
+      line-height: normal;
+      text-align: center;
+      outline: none;
+      box-shadow: none;
+      transition: none;
+    }
+
+    .help-close:hover,
+    .help-close:focus,
+    .help-close:active {
+      background: none !important;
+      color: #666;
+      outline: none;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .help-panel h3 {
+      font-size: 18px;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      color: #000;
+    }
+
+    .help-panel h3:first-of-type {
+      margin-top: 0;
+    }
+
+    .help-panel p {
+      margin-bottom: 12px;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    .help-panel ul {
+      margin: 12px 0;
+      padding-left: 24px;
+    }
+
+    .help-panel li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    .logo {
+      width: 180px;
+      height: auto;
+      margin: 0 auto 24px auto;
+      display: block;
+    }
+
     h1 {
-      font-size: 32px;
-      font-weight: 600;
-      margin-bottom: 40px;
+      font-family: 'Rubik Dirt', cursive;
+      font-size: 42px;
+      font-weight: 400;
+      margin-bottom: 16px;
       color: #000;
       letter-spacing: -0.5px;
+      text-align: center;
+    }
+
+    .help-link {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .help-link a {
+      color: #666;
+      text-decoration: none;
+      font-size: 14px;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+
+    .help-link a:hover {
+      color: #000;
     }
 
     .section {
@@ -156,135 +277,6 @@
       display: none;
     }
 
-    /* Modal styles */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-
-    .modal {
-      background: white;
-      border-radius: 16px;
-      padding: 32px;
-      max-width: 420px;
-      width: 100%;
-      position: relative;
-    }
-
-    .modal-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 24px;
-      text-align: center;
-    }
-
-    .modal-close {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      background: none;
-      border: none;
-      font-size: 24px;
-      color: #9ca3af;
-      cursor: pointer;
-      padding: 4px 8px;
-      min-width: auto;
-    }
-
-    .modal-close:hover {
-      color: #000;
-      background: none;
-      transform: none;
-    }
-
-    .wallet-options {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .wallet-option {
-      display: flex;
-      align-items: center;
-      padding: 16px;
-      border: 2px solid #e5e7eb;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      background: white;
-      text-align: left;
-    }
-
-    .wallet-option:hover {
-      border-color: #667eea;
-      background: #f8f9fa;
-      transform: none;
-    }
-
-    .wallet-option-icon {
-      font-size: 24px;
-      margin-right: 12px;
-    }
-
-    .wallet-option-text {
-      flex: 1;
-    }
-
-    .wallet-option-title {
-      font-weight: 600;
-      font-size: 15px;
-      margin-bottom: 2px;
-    }
-
-    .wallet-option-desc {
-      font-size: 13px;
-      color: #6b7280;
-    }
-
-    .qr-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-
-    #qrcode {
-      padding: 20px;
-      background: white;
-      border-radius: 12px;
-      border: 2px solid #e5e7eb;
-      display: inline-block;
-    }
-
-    #qrcode img,
-    #qrcode canvas {
-      display: block;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges;
-      image-rendering: pixelated;
-    }
-
-    .qr-instructions {
-      text-align: center;
-      color: #6b7280;
-      font-size: 14px;
-    }
-
-    .qr-timer {
-      font-size: 13px;
-      color: #9ca3af;
-      text-align: center;
-    }
-
     @media (max-width: 640px) {
       h1 {
         font-size: 28px;
@@ -301,38 +293,80 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>MotivateMe</h1>
+  <div class="page-wrapper" id="pageWrapper">
+    <div class="main-content">
+      <div class="container">
+        <img src="./logo.png" alt="MotivateMe Logo" class="logo">
+        <h1>MotivateMe</h1>
+        <div class="help-link">
+          <a onclick="document.getElementById('pageWrapper').classList.add('help-open'); document.getElementById('helpPanel').classList.add('open')">Help❓</a>
+        </div>
 
-    <div class="section">
-      <div class="row">
-        <button id="connectBtn">Connect wallet</button>
-        <div class="info" id="walletInfo">Not connected</div>
+        <div class="section">
+          <div class="row">
+            <button id="connectBtn">Connect wallet</button>
+            <div class="info" id="walletInfo">Not connected</div>
+          </div>
+        </div>
+
+        <div class="section hidden" id="actionsSection">
+          <div class="row">
+            <input type="text" id="recipientInput" placeholder="Recipient's address (0x...)" />
+          </div>
+          <div class="row">
+            <select id="functionSelect">
+              <option value="">Select Motivation</option>
+              <option value="read">Read counter</option>
+              <option value="increment">Increment +1</option>
+              <option value="set">Set value</option>
+            </select>
+            <div class="info" id="functionInfo">—</div>
+          </div>
+          <div id="setValueInput" class="hidden">
+            <input type="number" id="valueInput" placeholder="Enter value" />
+          </div>
+        </div>
+
+        <div class="contract-info">
+          <div>Contract address</div>
+          <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
+          <div id="walletBalance" class="hidden" style="margin-top: 8px;">
+            <div style="font-size: 12px; color: #8c8c8c;">Wallet balance of native ETH (full precision)</div>
+            <div id="balanceAmount" class="contract-address">—</div>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="section hidden" id="actionsSection">
-      <div class="row">
-        <input type="text" id="recipientInput" placeholder="Recipient address (0x...)" />
-      </div>
-      <div class="row">
-        <select id="functionSelect">
-          <option value="">Select Motivation</option>
-          <option value="read">Read counter</option>
-          <option value="increment">Increment +1</option>
-          <option value="set">Set value</option>
-        </select>
-        <div class="info" id="functionInfo">—</div>
-      </div>
-      <div id="setValueInput" class="hidden">
-        <input type="number" id="valueInput" placeholder="Enter value" />
-      </div>
-    </div>
+  <!-- Help Panel -->
+  <div id="helpPanel" class="help-panel">
+    <button class="help-close" onclick="document.getElementById('pageWrapper').classList.remove('help-open'); document.getElementById('helpPanel').classList.remove('open')">&times;</button>
 
-    <div class="contract-info">
-      <div>Contract address</div>
-      <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
-    </div>
+    <h3>🦥 What is <span style="font-family: 'Rubik Dirt', cursive;">MotivateMe</span>?</h3>
+    <p>MotivateMe is a blockchain dApp (decentralized application) where you can challenge yourself or others by locking cryptocurrency as motivation.
+      Money are released to the recipient only after the challenge is completed. Completion is defined in the Smart Contract.
+      All transactions happen on the <strong><a href="https://inkonchain.com/" target="_blank">Ink network</a></strong>.</p>
+
+    <h3>💰 Requirements for Challenger (locks money for the recipient)</h3>
+    <ul>
+      <li>EVM-compatible wallet (MetaMask, Kraken Wallet, etc.) as browser extension or mobile app.</li>
+      <li><strong>Small fraction of ETH on Ink network</strong> in the wallet to pay for gas fees - equivalent of USD subcents is enough.</li>
+      <li>To fund ETH to Ink network, you can use <a href="https://inkonchain.com/bridge" target="_blank">https://inkonchain.com/bridge</a> or any other bridge.</li>
+    </ul>
+
+    <h3>🎯 Requirements for Challenged (recipient of the money)</h3>
+    <ul>
+      <li>Ethereum-compatible address (0x...) generated by EVM-compatible wallet.</li>
+      <li>To see the received funds, recipient must add Ink network to the wallet.</li>
+      <li>Using Kraken wallet, funds can be easily transferred to Kraken exchange for further use or withdrawal.</li>
+    </ul>
+
+    <h3>⚠️ Important Notes</h3>
+    <ul>
+      <li>All transactions happen <strong>only on Ink network</strong>.</li>
+      <li>Gas fees are paid in ETH on Ink network.</li>
+    </ul>
   </div>
 
   <script type="module">
@@ -357,7 +391,7 @@
       blockExplorerUrls: ['https://explorer.inkonchain.com']
     };
 
-    // Select to INK_MAINNET or INK_SEPOLIA
+    // Select to INK_MAINNET or INK_SEPOLIA. Testnet looks like not supported by Kraken Wallet for write operations.
     // const ACTIVE_NETWORK = INK_SEPOLIA;
     const ACTIVE_NETWORK = INK_MAINNET;
 

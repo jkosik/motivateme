@@ -74,3 +74,6 @@ This starts a development server at http://localhost:5173
 ## Bridge
 - fund from kraken (how?)
 - inkonchin.com/bridge, connect wallet and swap ETH from Ethereum to ETH on Ink
+
+
+Kraken Wallet does not support write transactions when on testnet - bug? my misconfig?

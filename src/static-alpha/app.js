@@ -217,7 +217,7 @@ window.initializeApp = async function(config) {
       const rec = await tx.wait();
       setFunctionInfo(`Confirmed in block ${rec.blockNumber}`);
     } catch (e) {
-      console.error('Transaction error (full details):', e);
+      console.error('Transaction error:', e);
 
       // Provide clearer error messages
       let errorMsg = 'Transaction failed';
@@ -242,12 +242,9 @@ window.initializeApp = async function(config) {
         }
       } else if (e.code === 'ACTION_REJECTED') {
         errorMsg = 'You cancelled the transaction';
-      } else if (e.code === 'TIMEOUT' || e.message?.includes('timeout')) {
-        errorMsg = 'Confirmation timeout. Transaction may have succeeded - check counter.';
       } else if (e.message) {
-        // Show first part of error, but suggest checking console for full details
-        const shortMsg = e.message.slice(0, 60);
-        errorMsg = e.message.length > 60 ? `${shortMsg}... (check console F12)` : e.message;
+        // Shorten the error message if it's too long
+        errorMsg = e.message.slice(0, 80);
       }
 
       setFunctionInfo(`Error: ${errorMsg}`);
@@ -269,7 +266,7 @@ window.initializeApp = async function(config) {
       $('valueInput').value = '';
       $('setValueInput').classList.add('hidden');
     } catch (e) {
-      console.error('Transaction error (full details):', e);
+      console.error('Transaction error:', e);
 
       // Provide clearer error messages
       let errorMsg = 'Transaction failed';
@@ -294,12 +291,9 @@ window.initializeApp = async function(config) {
         }
       } else if (e.code === 'ACTION_REJECTED') {
         errorMsg = 'You cancelled the transaction';
-      } else if (e.code === 'TIMEOUT' || e.message?.includes('timeout')) {
-        errorMsg = 'Confirmation timeout. Transaction may have succeeded - check counter.';
       } else if (e.message) {
-        // Show first part of error, but suggest checking console for full details
-        const shortMsg = e.message.slice(0, 60);
-        errorMsg = e.message.length > 60 ? `${shortMsg}... (check console F12)` : e.message;
+        // Shorten the error message if it's too long
+        errorMsg = e.message.slice(0, 80);
       }
 
       setFunctionInfo(`Error: ${errorMsg}`);

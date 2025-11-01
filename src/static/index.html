@@ -4,18 +4,7 @@
   <meta charset="UTF-8" />
   <title>MotivateMe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnect v2 Standalone Bundle -->
-  <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.13.0/dist/index.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script>
-    // The UMD bundle should expose WalletConnectProvider globally
-    console.log('Checking for WalletConnect globals:', {
-      WalletConnectProvider: typeof window.WalletConnectProvider,
-      ethereum: typeof window.ethereum,
-      allGlobals: Object.keys(window).filter(k => k.toLowerCase().includes('wallet'))
-    });
-  </script>
+  <script type="module" src="./app.js"></script>
   <style>
     * {
       margin: 0;
@@ -346,15 +335,7 @@
     </div>
   </div>
 
-  <!-- Connection Modal -->
-  <div id="connectModal" class="modal-overlay hidden" style="display: none;">
-    <div class="modal">
-      <button class="modal-close" id="modalCloseBtn">×</button>
-      <div id="modalContent"></div>
-    </div>
-  </div>
-
-  <script>
+  <script type="module">
     // ---- CONFIG ----
     // Testnet Configuration (Ink Sepolia)
     const INK_SEPOLIA = {
@@ -376,12 +357,15 @@
       blockExplorerUrls: ['https://explorer.inkonchain.com']
     };
 
-    // *** SELECT ACTIVE NETWORK HERE ***
-    const ACTIVE_NETWORK = INK_SEPOLIA;  // Change to INK_MAINNET for mainnet
+    // Select to INK_MAINNET or INK_SEPOLIA
+    // const ACTIVE_NETWORK = INK_SEPOLIA;
+    const ACTIVE_NETWORK = INK_MAINNET;
 
+    // Address is based on nonce (transaction count) and Deployer address. If we use fresh new wallet, nonce is 0
+    // and the address is the same on Testnet and Mainnet.
     const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
 
-    // WalletConnect v2 Project ID
+    // WalletConnect v2 Project ID from https://dashboard.reown.com
     const WALLETCONNECT_PROJECT_ID = 'd608436759f83467578a0fda722d7542';
 
     // Minimal ABI for Counter
@@ -393,426 +377,17 @@
         "stateMutability": "view", "type": "function" }
     ];
 
-    // ---- STATE ----
-    let provider, signer, contract, wcProvider;
-    let qrExpiryTimer;
-
-    const $ = (id) => document.getElementById(id);
-
-    // Set contract address with link to block explorer
-    const explorerUrl = `${ACTIVE_NETWORK.blockExplorerUrls[0]}/address/${CONTRACT_ADDRESS}`;
-    $('contractAddr').textContent = CONTRACT_ADDRESS;
-    $('contractAddr').href = explorerUrl;
-
-    // Update page title with active network
-    document.title = `MotivateMe · ${ACTIVE_NETWORK.chainName}`;
-
-    function setWalletInfo(msg, connected = false) {
-      const el = $('walletInfo');
-      el.textContent = msg;
-      if (connected) {
-        el.classList.add('connected');
-      } else {
-        el.classList.remove('connected');
-      }
-    }
-
-    function setFunctionInfo(msg) {
-      $('functionInfo').textContent = msg;
-    }
-
-    function showActionsSection(show) {
-      if (show) {
-        $('actionsSection').classList.remove('hidden');
-      } else {
-        $('actionsSection').classList.add('hidden');
-      }
-    }
-
-    function getRecipientAddress() {
-      return $('recipientInput').value.trim();
-    }
-
-    function isValidAddress(address) {
-      return address && /^0x[a-fA-F0-9]{40}$/.test(address);
-    }
-
-    // ---- MODAL FUNCTIONS ----
-    function closeConnectModal() {
-      const modal = $('connectModal');
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-      if (qrExpiryTimer) clearInterval(qrExpiryTimer);
-    }
-
-    function openModal() {
-      const modal = $('connectModal');
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    }
-
-    function showConnectOptions() {
-      const hasBrowserWallet = typeof window.ethereum !== 'undefined';
-
-      const modalContent = $('modalContent');
-      modalContent.innerHTML = `
-        <div class="modal-title">Connect Wallet</div>
-        <div class="wallet-options">
-          ${hasBrowserWallet ? `
-            <div class="wallet-option" onclick="connectBrowserWallet()">
-              <div class="wallet-option-icon">🦊</div>
-              <div class="wallet-option-text">
-                <div class="wallet-option-title">Browser Extension</div>
-                <div class="wallet-option-desc">MetaMask, Coinbase, Rabby</div>
-              </div>
-            </div>
-          ` : `
-            <div class="wallet-option" style="opacity: 0.5; cursor: not-allowed; border-style: dashed;">
-              <div class="wallet-option-icon">🦊</div>
-              <div class="wallet-option-text">
-                <div class="wallet-option-title">Browser Extension</div>
-                <div class="wallet-option-desc">No wallet detected - Install MetaMask</div>
-              </div>
-            </div>
-          `}
-          <div class="wallet-option" onclick="showQRCode()">
-            <div class="wallet-option-icon">📱</div>
-            <div class="wallet-option-text">
-              <div class="wallet-option-title">Mobile Wallet</div>
-              <div class="wallet-option-desc">Scan QR with Kraken, Trust, Rainbow</div>
-            </div>
-          </div>
-        </div>
-      `;
-
-      openModal();
-    }
-
-    async function showQRCode() {
-      const modalContent = $('modalContent');
-      modalContent.innerHTML = `
-        <div class="modal-title">Scan with Mobile Wallet</div>
-        <div class="qr-container">
-          <div id="qrcode"></div>
-          <div class="qr-instructions">
-            Open your wallet app and scan this QR code
-          </div>
-          <div class="qr-timer" id="qrTimer">Initializing...</div>
-        </div>
-      `;
-
-      try {
-        await connectWalletConnect();
-      } catch (e) {
-        console.error('Connection error:', e);
-        $('qrTimer').textContent = `Error: ${e.message || 'Connection failed'}`;
-        $('qrTimer').style.color = '#991b1b';
-        setFunctionInfo(`Connection failed: ${e.message || e}`);
-        // Don't close modal so user can see the error
-      }
-    }
-
-    function haveProvider() {
-      if (!window.ethereum) {
-        setFunctionInfo('No wallet detected');
-        return false;
-      }
-      return true;
-    }
-
-    async function ensureCorrectNetwork() {
-      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainIdHex.toLowerCase() !== ACTIVE_NETWORK.chainId) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: ACTIVE_NETWORK.chainId }],
-          });
-        } catch (err) {
-          // If the chain is not added, add it
-          if (err.code === 4902 || (err.data && err.data.originalError && err.data.originalError.code === 4902)) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [ACTIVE_NETWORK],
-            });
-          } else {
-            throw err;
-          }
-        }
-      }
-    }
-
-    async function initProviderAndContract() {
-      provider = new ethers.BrowserProvider(window.ethereum);
-      signer = await provider.getSigner();
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      const acct = await signer.getAddress();
-      const net = await provider.getNetwork();
-
-      // Use network name from active config
-      let networkName = ACTIVE_NETWORK.chainName;
-
-      // Verify we're on the correct chain
-      if (Number(net.chainId) !== ACTIVE_NETWORK.chainIdDecimal) {
-        networkName = `Wrong network (${Number(net.chainId)})`;
-      }
-
-      setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
-      showActionsSection(true);
-    }
-
-    // ---- WALLET CONNECTION FUNCTIONS ----
-    async function connectBrowserWallet() {
-      try {
-        closeConnectModal();
-        if (!haveProvider()) return;
-        setWalletInfo('Connecting...');
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        await ensureCorrectNetwork();
-        await initProviderAndContract();
-        setFunctionInfo('Connected');
-      } catch (e) {
-        console.error(e);
-        setWalletInfo('Connection failed');
-        setFunctionInfo(e.message || 'Connection failed');
-      }
-    }
-
-    async function connectWalletConnect() {
-      try {
-        console.log('Step 1: Checking for WalletConnect library...');
-        console.log('window.WalletConnectProvider:', window.WalletConnectProvider);
-        console.log('window.EthereumProvider:', window.EthereumProvider);
-
-        // The UMD bundle might expose it under different names
-        const EthereumProvider = window.WalletConnectProvider?.EthereumProvider ||
-                                  window.EthereumProvider ||
-                                  window['@walletconnect/ethereum-provider'];
-
-        if (!EthereumProvider) {
-          console.error('❌ No WalletConnect provider found!');
-          console.log('Available window properties:', Object.keys(window).slice(0, 50));
-          throw new Error('WalletConnect library not found. The CDN might be blocked or the library failed to load.');
-        }
-
-        console.log('Step 2: EthereumProvider found!', EthereumProvider);
-        $('qrTimer').textContent = 'Initializing WalletConnect...';
-
-        console.log('Step 3: Creating provider with config:', {
-          projectId: WALLETCONNECT_PROJECT_ID,
-          chainId: ACTIVE_NETWORK.chainIdDecimal,
-          rpc: ACTIVE_NETWORK.rpcUrls[0]
+    // Initialize the app with configuration
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.initializeApp) {
+        window.initializeApp({
+          ACTIVE_NETWORK,
+          CONTRACT_ADDRESS,
+          ABI,
+          WALLETCONNECT_PROJECT_ID
         });
-
-        // Initialize WalletConnect v2 provider
-        wcProvider = await EthereumProvider.init({
-          projectId: WALLETCONNECT_PROJECT_ID,
-          chains: [ACTIVE_NETWORK.chainIdDecimal],
-          optionalChains: [ACTIVE_NETWORK.chainIdDecimal],
-          rpcMap: {
-            [ACTIVE_NETWORK.chainIdDecimal]: ACTIVE_NETWORK.rpcUrls[0]
-          },
-          showQrModal: false,
-          metadata: {
-            name: 'MotivateMe',
-            description: 'MotivateMe Counter dApp',
-            url: window.location.origin,
-            icons: ['https://walletconnect.com/walletconnect-logo.png']
-          }
-        });
-
-        console.log('Step 4: Provider created successfully!', wcProvider);
-        $('qrTimer').textContent = 'Waiting for QR code...';
-
-        // Display QR code when URI is available
-        wcProvider.on('display_uri', (uri) => {
-          console.log('Step 5: QR URI received!', uri);
-
-          // Clear previous QR code
-          const qrContainer = document.getElementById('qrcode');
-          qrContainer.innerHTML = '';
-
-          // Generate QR code
-          new QRCode(qrContainer, {
-            text: uri,
-            width: 200,
-            height: 200,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
-          });
-
-          console.log('Step 6: QR code displayed!');
-
-          // Set expiry timer
-          let secondsLeft = 300;
-          qrExpiryTimer = setInterval(() => {
-            secondsLeft--;
-            const minutes = Math.floor(secondsLeft / 60);
-            const seconds = secondsLeft % 60;
-            $('qrTimer').textContent = `Expires in ${minutes}:${seconds.toString().padStart(2, '0')}`;
-            if (secondsLeft <= 0) {
-              clearInterval(qrExpiryTimer);
-              closeConnectModal();
-            }
-          }, 1000);
-        });
-
-        console.log('Step 7: Enabling WalletConnect...');
-        await wcProvider.enable();
-
-        console.log('Step 8: Connected! Initializing ethers provider...');
-
-        // Initialize provider and contract
-        provider = new ethers.BrowserProvider(wcProvider);
-        signer = await provider.getSigner();
-        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-        const acct = await signer.getAddress();
-        const net = await provider.getNetwork();
-
-        let networkName = ACTIVE_NETWORK.chainName;
-        if (Number(net.chainId) !== ACTIVE_NETWORK.chainIdDecimal) {
-          networkName = `Wrong network (${Number(net.chainId)})`;
-        }
-
-        setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
-        showActionsSection(true);
-        setFunctionInfo('Connected');
-        closeConnectModal();
-
-        console.log('Step 9: All done!');
-      } catch (e) {
-        console.error('❌ WalletConnect error at some step:', e);
-        $('qrTimer').textContent = `Error: ${e.message}`;
-        $('qrTimer').style.color = '#991b1b';
-        throw e;
       }
-    }
-
-    // Connect wallet button - show modal
-    $('connectBtn').onclick = () => {
-      showConnectOptions();
-    };
-
-    // Function dropdown
-    $('functionSelect').onchange = async (e) => {
-      const val = e.target.value;
-
-      // Reset
-      $('setValueInput').classList.add('hidden');
-
-      if (!val) {
-        setFunctionInfo('—');
-        return;
-      }
-
-      if (!contract) {
-        setFunctionInfo('Please connect wallet first');
-        e.target.value = '';
-        return;
-      }
-
-      // Handle different functions
-      if (val === 'read') {
-        await readCounter();
-      } else if (val === 'increment') {
-        await incrementCounter();
-      } else if (val === 'set') {
-        $('setValueInput').classList.remove('hidden');
-        setFunctionInfo('Enter value and press Enter');
-      }
-
-      // Reset dropdown
-      e.target.value = '';
-    };
-
-    // Set value input
-    $('valueInput').onkeypress = async (e) => {
-      if (e.key === 'Enter') {
-        await setCounter();
-      }
-    };
-
-    async function readCounter() {
-      try {
-        setFunctionInfo('Reading...');
-        const v = await contract.number();
-        setFunctionInfo(`Current value: ${v.toString()}`);
-      } catch (e) {
-        console.error(e);
-        setFunctionInfo(`Error: ${e.message || 'Read failed'}`);
-      }
-    }
-
-    async function incrementCounter() {
-      try {
-        // Get recipient address if needed for your contract functions
-        const recipient = getRecipientAddress();
-
-        // Example: validate if your function requires a recipient
-        // if (!isValidAddress(recipient)) {
-        //   setFunctionInfo('Please enter a valid recipient address');
-        //   return;
-        // }
-
-        setFunctionInfo('Sending transaction...');
-        const tx = await contract.increment();
-        // If your contract function needs recipient: await contract.yourFunction(recipient)
-        setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
-        const rec = await tx.wait();
-        setFunctionInfo(`Confirmed in block ${rec.blockNumber}`);
-        setTimeout(() => readCounter(), 1000);
-      } catch (e) {
-        console.error(e);
-        setFunctionInfo(`Error: ${e.message || 'Transaction failed'}`);
-      }
-    }
-
-    async function setCounter() {
-      try {
-        const val = $('valueInput').value;
-        if (!val) {
-          setFunctionInfo('Please enter a value');
-          return;
-        }
-        setFunctionInfo(`Setting to ${val}...`);
-        const tx = await contract.setNumber(BigInt(val));
-        setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
-        const rec = await tx.wait();
-        setFunctionInfo(`Set to ${val} in block ${rec.blockNumber}`);
-        $('valueInput').value = '';
-        $('setValueInput').classList.add('hidden');
-        setTimeout(() => readCounter(), 1000);
-      } catch (e) {
-        console.error(e);
-        setFunctionInfo(`Error: ${e.message || 'Transaction failed'}`);
-      }
-    }
-
-    // Auto-update UI if chain/account changes
-    if (window.ethereum) {
-      window.ethereum.on?.('chainChanged', () => location.reload());
-      window.ethereum.on?.('accountsChanged', () => location.reload());
-    }
-
-    // Handle WalletConnect disconnection
-    window.addEventListener('walletconnect_disconnect', () => {
-      console.log('WalletConnect disconnected');
-      location.reload();
     });
-
-    // Close modal on overlay click
-    $('connectModal').onclick = (e) => {
-      if (e.target.id === 'connectModal') {
-        closeConnectModal();
-      }
-    };
-
-    // Close modal on X button click
-    $('modalCloseBtn').onclick = (e) => {
-      e.stopPropagation();
-      closeConnectModal();
-    };
   </script>
 </body>
 </html>

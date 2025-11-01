@@ -6,14 +6,9 @@ import (
 )
 
 func main() {
-	// Serve /static
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
-
-	// Serve index at /
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "static/index.html")
-	})
+	// Serve built files from ../dist
+	fs := http.FileServer(http.Dir("../dist"))
+	http.Handle("/", fs)
 
 	addr := ":8080"
 	log.Printf("➡️  Serving on http://localhost%s ...", addr)

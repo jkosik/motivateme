@@ -1,0 +1,18 @@
+{
+  "name": "motivateme",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "./node_modules/.bin/vite build",
+    "dev": "./node_modules/.bin/vite"
+  },
+  "dependencies": {
+    "@reown/appkit": "^1.0.2",
+    "@reown/appkit-adapter-ethers": "^1.0.2",
+    "ethers": "^6.13.2"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
+

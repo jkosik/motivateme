@@ -1,49 +1,42 @@
 # MotivateMe
 
+
 Counter dApp on Ink blockchain with WalletConnect v2 support.
 
-## Use Cases
+## Todo
 - Just smile and time-based release
 - Manual confirmation from sender
 - Oracle integration
+- paid sum in various currency? locked sum in wei or eth?
+- mteadata added to the transactions
 
-## Prerequisites
-
-- Node.js (v18+)
-- Go (v1.21+)
-
-## Setup
+## Build and run
+`src/dist/` holds `@reown/appkit` NPM-built code
 
 ```bash
+cd src/
 npm install
-# 1. Build frontend (run this after any changes to src/static/)
 npm run build
 
-# 2. Start Go server
-cd src
 go run main.go
-
-# Visit http://localhost:8080
+#or
+npm run dev
 ```
 
 ## Configuration
-
 ### Network Selection
-
 Edit `src/static/index.html`:
 ```javascript
-const ACTIVE_NETWORK = INK_SEPOLIA;  // or INK_MAINNET
+const ACTIVE_NETWORK = INK_SEPOLIA;  // or INK_MAINNET. INK_SEPOLIA seems not supporting write operations for contracts
 ```
 
 ### Contract Address
-
 Edit `src/static/index.html`:
 ```javascript
 const CONTRACT_ADDRESS = '0x...';
 ```
 
 ## Project Structure
-
 ```
 .
 ├── src/
@@ -55,25 +48,185 @@ const CONTRACT_ADDRESS = '0x...';
 └── vite.config.js       # Build configuration
 ```
 
-## Deployment
-
-```bash
-# Build frontend
-npm run build
-
-# Run Go server (serves files from dist/)
-cd src
-go run main.go
-```
-
-
-npm run dev
-This starts a development server at http://localhost:5173
-
-
 ## Bridge
 - fund from kraken (how?)
 - inkonchin.com/bridge, connect wallet and swap ETH from Ethereum to ETH on Ink
 
 
 Kraken Wallet does not support write transactions when on testnet - bug? my misconfig?
+
+
+
+
+----
+
+
+curl -L https://foundry.paradigm.xyz | bash
+source /home/ubuntu/.bashrc
+foundryup
+
+installs:
+forge - deploys smart contracts
+cast - CLI for interatciton with blockchain/nodes/contracts
+anvil - local Ethereum node
+chisel - Solidity playground
+
+cd motivateme/contract-foundry/
+forge init --no-git
+
+
+forge build # compiles /src and deps => saves to out/ (compiles also all deps and builds many files in out/)
+
+forge inspect src/Counter.sol:Counter abi
+forge inspect src/Counter.sol:Counter bytecode
+
+- Create Makefile
+- create .env
+- make build dist
+
+`out/Counter.sol/Counter.json` is only what we need. copied to `dist/Counter.json`
+
+Create dedicated wallet for deploying the contract
+cast wallet new
+Successfully created new keypair.
+Address:     0xxxxxx
+Private key: 0xxxxxx
+
+
+export WALLET_ADDRESS=0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
+export WALLET_PRIVATE_KEY=
+
+
+## Fund the account with Testnet ETH to interact with Ink
+https://docs.inkonchain.com/tools/faucets
+
+
+cast balance $WALLET_ADDRESS --rpc-url https://ink-sepolia.drpc.org
+cast balance $WALLET_ADDRESS --rpc-url "https://rpc-gel.inkonchain.com" --ether
+
+```
+ubuntu@host-c-dev:/data/motivateme$ cast balance $WALLET_ADDRESS --rpc-url https://ink-sepolia.drpc.org
+0
+ubuntu@host-c-dev:/data/motivateme$ cast balance $WALLET_ADDRESS --rpc-url https://ink-sepolia.drpc.org
+20000000000000000
+```
+
+## Deploy contract
+Note: There are safer ways of handling private key using forge keystore.
+Dry-run:
+```
+forge create src/Counter.sol:Counter \
+  --rpc-url "https://ink-sepolia.drpc.org" \
+  --private-key $WALLET_PRIVATE_KEY
+```
+
+Deployment:
+```
+forge create src/Counter.sol:Counter \
+  --rpc-url "https://ink-sepolia.drpc.org" \
+  --private-key $WALLET_PRIVATE_KEY \
+  --broadcast
+```
+
+```
+ubuntu@host-c-dev:/data/motivateme$ forge create src/Counter.sol:Counter \
+  --rpc-url "https://ink-sepolia.drpc.org" \
+  --private-key $WALLET_PRIVATE_KEY \
+  --broadcast
+[⠊] Compiling...
+No files changed, compilation skipped
+Deployer: 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
+Deployed to: 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+Transaction hash: 0x5ec7e54d85e9314c1f971b5d9fa8234fe04c1b36ea9a7543f287e5d88a8d6927
+```
+
+
+https://explorer-sepolia.inkonchain.com/address/0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+https://explorer-sepolia.inkonchain.com/tx/0x5ec7e54d85e9314c1f971b5d9fa8234fe04c1b36ea9a7543f287e5d88a8d6927
+
+
+## MAINNET
+```
+cd contract-foundry
+forge create src/Counter.sol:Counter \
+  --rpc-url "https://rpc-gel.inkonchain.com" \
+  --private-key $WALLET_PRIVATE_KEY \
+  --broadcast
+
+[⠊] Compiling...
+[⠒] Compiling 1 files with Solc 0.8.30
+[⠢] Solc 0.8.30 finished in 6.66ms
+Compiler run successful!
+Deployer: 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
+Deployed to: 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+Transaction hash: 0xe6e1469031d858025e8785bf3470d005e29d7d5a928c75b2b29ce09891551706
+```
+
+https://explorer.inkonchain.com/address/0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+
+## Interact with contract
+Read:
+```
+cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
+0
+```
+
+Call function and increment value
+```
+cast send 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "increment()" \
+  --rpc-url https://ink-sepolia.drpc.org \
+  --private-key $WALLET_PRIVATE_KEY
+
+
+
+contractAddress
+cumulativeGasUsed    12378464
+effectiveGasPrice    253
+from                 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
+gasUsed              43482
+logs                 []
+logsBloom            0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+root
+status               1 (success)
+transactionHash      0xfd0adaed8632985befd7583e84615094b4dbb5a38ef07e9f672b140247c77923
+transactionIndex     2
+type                 2
+blobGasPrice
+blobGasUsed
+to                   0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+l1BaseFeeScalar      801949
+l1BlobBaseFee        1
+l1BlobBaseFeeScalar  0
+l1Fee                11548
+l1GasPrice           9
+l1GasUsed            1600
+```
+
+```
+cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
+1
+```
+
+
+Blockscout is an open-source blockchain explorer framework (for EVM-compatible chains) that lets you view transactions, contracts, addresses, blocks, tokens, and more. - https://explorer-sepolia.inkonchain.com/ is based on blockscout
+
+
+https://docs.walletconnect.network/app-sdk/javascript/installation
+
+
+On Ink, we need ETH for trasacting and othe currency to lock for motivateme challenge
+
+
+Transaction (stored on-chain):
+├─ Transaction Data
+│  ├─ From: 0xBob...
+│  ├─ To: 0xContract...
+│  ├─ Value: 1.2 ETH
+│  ├─ Gas Used: 75,000
+│  └─ Function: pocketMoney(0xAlice)
+│
+└─ Transaction Receipt/Logs (also on-chain!)
+   ├─ Status: Success ✅
+   ├─ Block Number: 12345678
+   └─ Events (logs):
+       └─ PocketMoneyDeposited(0xBob, 0xAlice, 1.2 ETH)

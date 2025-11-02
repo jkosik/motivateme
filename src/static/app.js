@@ -96,7 +96,7 @@ window.initializeApp = async function(config) {
     const el = $('walletInfo');
     el.textContent = msg;
     if (connected) {
-      el.style.color = '#00d26a'; // Green when connected
+      el.style.color = '#5848D5'; // Purple when connected
       el.style.fontWeight = '500';
     } else {
       el.style.color = '#8c8c8c'; // Gray when not connected
@@ -118,11 +118,47 @@ window.initializeApp = async function(config) {
   }
 
   function getRecipientAddress() {
-    return $('recipientInput').value.trim();
+    const address = $('recipientInput').value.trim();
+
+    if (!address) {
+      setFunctionInfo('❌ Please enter recipient address');
+      return null;
+    }
+
+    // Basic format validation
+    if (!ethers.isAddress(address)) {
+      setFunctionInfo('❌ Invalid address format. Must be 0x... (42 chars)');
+      return null;
+    }
+
+    // Checksum validation (if address uses mixed case)
+    try {
+      const checksumAddress = ethers.getAddress(address);
+      // If the user provided mixed case, verify it matches the checksum
+      if (address !== address.toLowerCase() && address !== address.toUpperCase()) {
+        if (address !== checksumAddress) {
+          setFunctionInfo('❌ Invalid checksum. Did you mistype the address?');
+          return null;
+        }
+      }
+      // Return the properly checksummed address
+      return checksumAddress;
+    } catch (e) {
+      setFunctionInfo('❌ Address validation failed');
+      return null;
+    }
   }
 
   function isValidAddress(address) {
-    return address && /^0x[a-fA-F0-9]{40}$/.test(address);
+    if (!address || !ethers.isAddress(address)) {
+      return false;
+    }
+    try {
+      ethers.getAddress(address);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function isValidContractPrefix(address) {
@@ -195,33 +231,151 @@ window.initializeApp = async function(config) {
     }
   });
 
-  // Function dropdown
-  $('functionSelect').onchange = async (e) => {
+  // Function dropdown - only show/hide input fields, don't trigger actions
+  $('functionSelect').onchange = (e) => {
     const val = e.target.value;
 
     $('setValueInput').classList.add('hidden');
+    setFunctionInfo('');
+
+    if (val === 'set') {
+      $('setValueInput').classList.remove('hidden');
+      setFunctionInfo('Enter value, then click MotivateMe');
+    }
+  };
+
+  // Function to read and log all contract events
+  async function logContractEvents() {
+    if (!contract) {
+      console.log('⚠️ Contract not initialized');
+      return;
+    }
+
+    console.log('');
+    console.log('═══════════════════════════════════════════════');
+    console.log('📜 READING CONTRACT EVENT HISTORY FROM BLOCKCHAIN');
+    console.log('═══════════════════════════════════════════════');
+    console.log('');
+
+    try {
+      // Check if contract supports MotivateMe events
+      if (!contract.filters.Gifted) {
+        console.log('ℹ️ This contract does not emit MotivateMe events');
+        console.log('   (Connected to Counter.sol or different contract)');
+        console.log('');
+        return;
+      }
+      // Query all Gifted events
+      console.log('🎁 Querying all Gifted events...');
+      const giftedEvents = await contract.queryFilter(
+        contract.filters.Gifted()
+      );
+      console.log(`   Found ${giftedEvents.length} gift transactions`);
+
+      if (giftedEvents.length > 0) {
+        console.log('   Recent gifts:');
+        giftedEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. ${event.args.sender} → ${event.args.recipient}`);
+          console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Block: ${event.blockNumber}`);
+        });
+      }
+      console.log('');
+
+      // Query all PocketMoneyDeposited events
+      console.log('💰 Querying all PocketMoney deposits...');
+      const depositEvents = await contract.queryFilter(
+        contract.filters.PocketMoneyDeposited()
+      );
+      console.log(`   Found ${depositEvents.length} pocket money deposits`);
+
+      if (depositEvents.length > 0) {
+        console.log('   Recent deposits:');
+        depositEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. ${event.args.sender} → ${event.args.recipient}`);
+          console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Block: ${event.blockNumber}`);
+        });
+      }
+      console.log('');
+
+      // Query all PocketMoneyWithdrawn events
+      console.log('💸 Querying all PocketMoney withdrawals...');
+      const withdrawalEvents = await contract.queryFilter(
+        contract.filters.PocketMoneyWithdrawn()
+      );
+      console.log(`   Found ${withdrawalEvents.length} withdrawals`);
+
+      if (withdrawalEvents.length > 0) {
+        console.log('   Recent withdrawals:');
+        withdrawalEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. ${event.args.recipient}`);
+          console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Block: ${event.blockNumber}`);
+        });
+      }
+      console.log('');
+
+      // Calculate statistics
+      console.log('📊 CONTRACT STATISTICS:');
+      console.log('═══════════════════════════════════════════════');
+
+      // Unique recipients
+      const allRecipients = new Set([
+        ...giftedEvents.map(e => e.args.recipient),
+        ...depositEvents.map(e => e.args.recipient)
+      ]);
+      console.log(`   Total unique recipients: ${allRecipients.size}`);
+
+      // Total amounts
+      const totalGifted = giftedEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const totalDeposited = depositEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const totalWithdrawn = withdrawalEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+
+      console.log(`   Total gifted: ${ethers.formatEther(totalGifted)} ETH`);
+      console.log(`   Total deposited: ${ethers.formatEther(totalDeposited)} ETH`);
+      console.log(`   Total withdrawn: ${ethers.formatEther(totalWithdrawn)} ETH`);
+      console.log(`   Locked in contract: ${ethers.formatEther(totalDeposited - totalWithdrawn)} ETH`);
+
+      // Contract balance (current state)
+      const contractBalance = await contract.getBalance();
+      console.log(`   Actual contract balance: ${ethers.formatEther(contractBalance)} ETH`);
+
+      console.log('═══════════════════════════════════════════════');
+      console.log('✅ Event history loaded successfully!');
+      console.log('');
+
+    } catch (error) {
+      console.error('❌ Error reading events:', error);
+    }
+  }
+
+  // MotivateMe button - triggers the selected action with validation
+  $('motivateBtn').onclick = async () => {
+    const val = $('functionSelect').value;
 
     if (!val) {
-      setFunctionInfo('');
+      setFunctionInfo('❌ Please select a motivation first');
       return;
     }
 
     if (!contract) {
-      setFunctionInfo('Please connect wallet first');
-      e.target.value = '';
+      setFunctionInfo('❌ Please connect wallet first');
       return;
     }
 
+    // Log all contract events first
+    console.log('🔍 Reading contract event history...');
+    await logContractEvents();
+
+    // Read doesn't need recipient validation, but increment and set do
     if (val === 'read') {
       await readCounter();
     } else if (val === 'increment') {
       await incrementCounter();
     } else if (val === 'set') {
-      $('setValueInput').classList.remove('hidden');
-      setFunctionInfo('Enter value and press Enter');
+      await setCounter();
     }
-
-    e.target.value = '';
   };
 
   // Set value input
@@ -259,7 +413,9 @@ window.initializeApp = async function(config) {
   async function incrementCounter() {
     try {
       const recipient = getRecipientAddress();
-      // Recipient validation could be added here if needed
+      if (!recipient) {
+        return; // Error message already set by getRecipientAddress()
+      }
 
       setFunctionInfo('Confirm transaction in your wallet...');
       const tx = await contract.increment();
@@ -306,6 +462,11 @@ window.initializeApp = async function(config) {
 
   async function setCounter() {
     try {
+      const recipient = getRecipientAddress();
+      if (!recipient) {
+        return; // Error message already set by getRecipientAddress()
+      }
+
       const val = $('valueInput').value;
       if (!val) {
         setFunctionInfo('Please enter a value');

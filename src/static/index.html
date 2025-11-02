@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rubik+Dirt&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rubik+Dirt&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
   <script type="module" src="./app.js"></script>
   <style>
     * {
@@ -188,7 +188,8 @@
       border-radius: 8px;
       padding: 12px 24px;
       font-size: 15px;
-      font-weight: 500;
+      font-weight: 700;
+      font-family: 'Rubik', sans-serif;
       cursor: pointer;
       transition: all 0.15s ease;
       min-width: 140px;
@@ -196,6 +197,14 @@
 
     button:hover {
       background: #333;
+    }
+
+    #motivateBtn {
+      background: #5848D5;
+    }
+
+    #motivateBtn:hover {
+      background: #4a3bb8;
     }
 
     button:active {
@@ -379,6 +388,7 @@
           <div id="setValueInput" class="hidden">
             <input type="number" id="valueInput" placeholder="Enter value" />
           </div>
+          <button id="motivateBtn" style="margin-top: 12px;">MotivateMe</button>
           <div class="info" id="functionInfo" style="text-align: center; margin-top: 12px; font-size: 14px;"></div>
         </div>
 
@@ -421,6 +431,7 @@
       <li>EVM-compatible wallet (MetaMask, Kraken Wallet, etc.) as browser extension or mobile app.</li>
       <li><strong>Small fraction of ETH on Ink network</strong> in the wallet to pay for gas fees - equivalent of USD subcents is enough.</li>
       <li>To fund ETH to Ink network, you can use <a href="https://inkonchain.com/bridge" target="_blank">https://inkonchain.com/bridge</a> or any other bridge.</li>
+      <li>Another easy way for funding is using Kraken Wallet and direct funding from Kraken Exchange account.</li>
     </ul>
 
     <h3>🎯 Requirements for Challenged (recipient of the money)</h3>

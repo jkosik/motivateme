@@ -22,12 +22,12 @@
       min-height: 100vh;
       display: flex;
       line-height: 1.6;
-      overflow: hidden;
     }
 
     .page-wrapper {
       display: flex;
       width: 100%;
+      min-height: 100vh;
       transition: margin-right 0.3s ease;
     }
 
@@ -41,6 +41,7 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
+      overflow-y: auto;
     }
 
     .container {
@@ -124,6 +125,78 @@
       color: #333;
     }
 
+    .claim-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #fafafa;
+    }
+
+    .claim-card-header {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #000;
+    }
+
+    .claim-card-detail {
+      font-size: 13px;
+      margin: 4px 0;
+      color: #555;
+    }
+
+    .claim-card-status {
+      margin: 8px 0;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      display: inline-block;
+    }
+
+    .status-locked {
+      background: #fee;
+      color: #c33;
+    }
+
+    .status-ready {
+      background: #efe;
+      color: #3c3;
+    }
+
+    .claim-btn {
+      margin-top: 8px;
+      padding: 12px 24px;
+      background: #5848D5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+
+    .claim-btn:hover {
+      background: #4a3bb8;
+    }
+
+    .claim-btn:disabled {
+      background: #9ca3af;
+      color: #fff;
+      cursor: not-allowed;
+    }
+
+    .proof-input {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    }
+
     .logo {
       width: 180px;
       height: auto;
@@ -203,8 +276,14 @@
       background: #5848D5;
     }
 
-    #motivateBtn:hover {
+    #motivateBtn:hover:not(:disabled) {
       background: #4a3bb8;
+    }
+
+    #motivateBtn:disabled {
+      background: #9ca3af !important;
+      color: #fff !important;
+      cursor: not-allowed;
     }
 
     button:active {
@@ -212,8 +291,8 @@
     }
 
     button:disabled {
-      background: #e5e7eb;
-      color: #9ca3af;
+      background: #9ca3af;
+      color: #fff;
       cursor: not-allowed;
     }
 
@@ -302,7 +381,9 @@
     }
 
     input[type="number"],
-    input[type="text"] {
+    input[type="text"],
+    input[type="date"],
+    textarea {
       background: #fff;
       border: 1px solid #e5e7eb;
       border-radius: 8px;
@@ -311,10 +392,13 @@
       transition: all 0.15s ease;
       width: 100%;
       margin-bottom: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     }
 
     input[type="number"]:focus,
-    input[type="text"]:focus {
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    textarea:focus {
       outline: none;
       border-color: #000;
     }
@@ -367,30 +451,32 @@
         <img src="./logo.png" alt="MotivateMe Logo" class="logo">
         <h1>MotivateMe</h1>
         <div class="help-link">
-          <a onclick="document.getElementById('pageWrapper').classList.add('help-open'); document.getElementById('helpPanel').classList.add('open')">Help❓</a>
+          <a onclick="document.getElementById('claimsPanel').classList.remove('open'); document.getElementById('pageWrapper').classList.add('help-open'); document.getElementById('helpPanel').classList.add('open')">Help❓</a>
+          <span id="claimsPipe" style="margin: 0 8px; color: #ccc; display: none;">|</span>
+          <a id="claimsLink" onclick="document.getElementById('helpPanel').classList.remove('open'); document.getElementById('pageWrapper').classList.add('help-open'); document.getElementById('claimsPanel').classList.add('open')" style="display: none;">My Claims 💰</a>
         </div>
 
         <div class="section">
-          <div class="row">
+  <div class="row">
             <button id="connectBtn">Connect wallet</button>
             <div class="info" id="walletInfo">Not connected</div>
           </div>
-        </div>
+  </div>
 
         <div class="section hidden" id="actionsSection">
-          <input type="text" id="recipientInput" placeholder="Recipient's address (0x...)" />
           <select id="functionSelect">
             <option value="">Select Motivation</option>
-            <option value="read">Read counter</option>
-            <option value="increment">Increment +1</option>
-            <option value="set">Set value</option>
+            <option value="instantMotivation">Instant Motivation (immediate transfer)</option>
+            <option value="timelockedMotivation">Time-locked Motivation (unlock on date)</option>
+            <option value="proofOfActionMotivation">Proof-of-Action Motivation (recipient proves completion)</option>
           </select>
-          <div id="setValueInput" class="hidden">
-            <input type="number" id="valueInput" placeholder="Enter value" />
-          </div>
-          <button id="motivateBtn" style="margin-top: 12px;">MotivateMe</button>
+          <input type="text" id="recipientInput" placeholder="Recipient's address (0x...)" />
+          <input type="number" id="ethAmountInput" placeholder="Amount of motivation in ETH (e.g., 0.001)" step="0.000001" min="0" />
+          <input type="date" id="unlockDateInput" placeholder="Unlock date" style="display: none;" />
+          <textarea id="messageInput" placeholder="Message/description (will be stored on blockchain)" rows="2" style="resize: vertical; min-height: 50px;"></textarea>
           <div class="info" id="functionInfo" style="text-align: center; margin-top: 12px; font-size: 14px;"></div>
-        </div>
+          <button id="motivateBtn" style="margin-top: 12px;">Motivate</button>
+  </div>
 
         <div class="contract-info hidden" id="contractInfo">
           <div style="margin-bottom: 12px;">
@@ -410,7 +496,7 @@
           <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
           <div id="walletBalance" class="hidden" style="margin-top: 8px;">
             <div style="font-size: 12px; color: #8c8c8c;">Wallet balance of native ETH (full precision)</div>
-            <div id="balanceAmount" class="contract-address">—</div>
+            <div id="balanceAmount" style="font-family: monospace; font-size: 12px; color: #8c8c8c;">—</div>
           </div>
         </div>
       </div>
@@ -448,6 +534,14 @@
     </ul>
   </div>
 
+  <div id="claimsPanel" class="help-panel">
+    <button class="help-close" onclick="document.getElementById('pageWrapper').classList.remove('help-open'); document.getElementById('claimsPanel').classList.remove('open')">&times;</button>
+
+    <h3>💰 My Claimable Motivations</h3>
+    <p id="claimsLoading" style="color: #666;">Loading your claimable motivations...</p>
+    <div id="claimsList"></div>
+  </div>
+
   <script type="module">
     // ---- CONFIG ----
     // Testnet Configuration (Ink Sepolia)
@@ -478,7 +572,9 @@
     const CONTRACT_ADDRESSES = {
       'default': {
         name: 'Default Contract',
-        address: '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF'
+        // address: '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF' // Counter contract
+        address: '0xDe3FabeD53AE4D7d90C385621EcdEdc795189ea3' // MotivateMe contract
+        // address: '0x1913E1cdA0814fa2aF01d7637caB81d088a43183' // MotivateMe contract old
       },
       'alternative': {
         name: 'Alternative Contract',
@@ -493,12 +589,175 @@
     const WALLETCONNECT_PROJECT_ID = 'd608436759f83467578a0fda722d7542';
 
     // Minimal ABI for Counter
+    // MotivateMe.sol ABI
     const ABI = [
-      { "inputs": [], "name": "increment", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-      { "inputs": [ { "internalType": "uint256", "name": "newNumber", "type": "uint256" } ],
-        "name": "setNumber", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-      { "inputs": [], "name": "number", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
-        "stateMutability": "view", "type": "function" }
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+          { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "indexed": false, "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "InstantMotivation",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+          { "indexed": false, "internalType": "uint256", "name": "index", "type": "uint256" },
+          { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "indexed": false, "internalType": "uint256", "name": "unlockTimestamp", "type": "uint256" },
+          { "indexed": false, "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "TimelockedMotivationCreated",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+          { "indexed": false, "internalType": "uint256", "name": "index", "type": "uint256" },
+          { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+        ],
+        "name": "TimelockedMotivationClaimed",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+          { "indexed": false, "internalType": "uint256", "name": "index", "type": "uint256" },
+          { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "indexed": false, "internalType": "string", "name": "actionRequired", "type": "string" },
+          { "indexed": false, "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "ProofOfActionMotivationCreated",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+          { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+          { "indexed": false, "internalType": "uint256", "name": "index", "type": "uint256" },
+          { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "indexed": false, "internalType": "string", "name": "proofDescription", "type": "string" }
+        ],
+        "name": "ProofOfActionClaimed",
+        "type": "event"
+      },
+      {
+        "inputs": [
+          { "internalType": "address payable", "name": "recipient", "type": "address" },
+          { "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "instantMotivation",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "uint256", "name": "unlockTimestamp", "type": "uint256" },
+          { "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "timelockedMotivation",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "sender", "type": "address" },
+          { "internalType": "uint256", "name": "index", "type": "uint256" }
+        ],
+        "name": "claimTimelockedMotivation",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "string", "name": "actionRequired", "type": "string" },
+          { "internalType": "string", "name": "message", "type": "string" }
+        ],
+        "name": "proofOfActionMotivation",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "sender", "type": "address" },
+          { "internalType": "uint256", "name": "index", "type": "uint256" },
+          { "internalType": "string", "name": "proofDescription", "type": "string" }
+        ],
+        "name": "claimProofOfAction",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "", "type": "address" },
+          { "internalType": "address", "name": "", "type": "address" },
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "name": "timeLocks",
+        "outputs": [
+          { "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "internalType": "uint256", "name": "unlockTimestamp", "type": "uint256" },
+          { "internalType": "bool", "name": "claimed", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "", "type": "address" },
+          { "internalType": "address", "name": "", "type": "address" },
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "name": "proofOfActions",
+        "outputs": [
+          { "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "internalType": "string", "name": "actionRequired", "type": "string" },
+          { "internalType": "bool", "name": "claimed", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "address", "name": "sender", "type": "address" }
+        ],
+        "name": "getTimelockedCount",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "address", "name": "sender", "type": "address" }
+        ],
+        "name": "getProofOfActionCount",
+        "outputs": [
+          { "internalType": "uint256", "name": "", "type": "uint256" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
     ];
 
     // Initialize the app with configuration

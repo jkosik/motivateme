@@ -149,6 +149,67 @@ window.initializeApp = async function(config) {
     }
   }
 
+  function getEthAmount() {
+    const amountStr = $('ethAmountInput').value.trim();
+
+    if (!amountStr) {
+      setFunctionInfo('❌ Please enter ETH amount');
+      return null;
+    }
+
+    const amount = parseFloat(amountStr);
+
+    if (isNaN(amount) || amount <= 0) {
+      setFunctionInfo('❌ Invalid ETH amount. Must be greater than 0');
+      return null;
+    }
+
+    // Check if user has enough balance
+    // Note: This is just a warning, actual balance check happens on-chain
+    try {
+      const amountWei = ethers.parseEther(amountStr);
+      console.log(`📤 Sending: ${amountStr} ETH (${amountWei.toString()} Wei)`);
+      return amountWei;
+    } catch (e) {
+      setFunctionInfo('❌ Invalid ETH amount format');
+      return null;
+    }
+  }
+
+  function getUnlockDate() {
+    const dateStr = $('unlockDateInput').value.trim();
+
+    if (!dateStr) {
+      setFunctionInfo('❌ Please select unlock date');
+      return null;
+    }
+
+    try {
+      // Convert date string (YYYY-MM-DD) to Unix timestamp
+      const date = new Date(dateStr + 'T00:00:00Z'); // Treat as UTC midnight
+      const timestamp = Math.floor(date.getTime() / 1000);
+
+      // Check if date is in the future
+      const now = Math.floor(Date.now() / 1000);
+      if (timestamp <= now) {
+        setFunctionInfo('❌ Unlock date must be in the future');
+        return null;
+      }
+
+      console.log(`🗓️ Unlock date: ${dateStr} (Unix timestamp: ${timestamp})`);
+      return timestamp;
+    } catch (e) {
+      setFunctionInfo('❌ Invalid date format');
+      return null;
+    }
+  }
+
+  function getMessage() {
+    const message = $('messageInput').value.trim();
+    // Message is optional, so return empty string if not provided
+    return message || '';
+  }
+
   function isValidAddress(address) {
     if (!address || !ethers.isAddress(address)) {
       return false;
@@ -163,6 +224,18 @@ window.initializeApp = async function(config) {
 
   function isValidContractPrefix(address) {
     return address && address.startsWith('0x');
+  }
+
+  // Clear form inputs after successful transaction
+  function clearForm() {
+    $('recipientInput').value = '';
+    $('ethAmountInput').value = '';
+    $('unlockDateInput').value = '';
+    $('messageInput').value = '';
+    $('functionSelect').value = '';
+    $('unlockDateInput').style.display = 'none';
+    $('messageInput').placeholder = 'Message/description (will be stored on blockchain)';
+    console.log('✅ Form cleared');
   }
 
   // Initialize provider and contract after connection
@@ -182,6 +255,10 @@ window.initializeApp = async function(config) {
       setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
       showActionsSection(true);
       setFunctionInfo(''); // Clear function info when connected
+
+      // Show "My Claims" link and pipe when wallet is connected
+      $('claimsLink').style.display = 'inline';
+      $('claimsPipe').style.display = 'inline';
       $('connectBtn').textContent = 'Wallet';
       $('contractInfo').classList.remove('hidden'); // Show contract info
       await updateBalance(); // Update balance in footer
@@ -218,29 +295,61 @@ window.initializeApp = async function(config) {
       console.log('Found wallet provider, initializing contract...');
       await initContract(walletProvider);
     } else if (!walletProvider && contract) {
-      console.log('Wallet disconnected');
+      console.log('Wallet disconnected - clearing all state');
+
+      // Clear all WalletConnect/AppKit cache
+      try {
+        const wcKeys = Object.keys(localStorage).filter(key =>
+          key.startsWith('wc@') ||
+          key.startsWith('@w3m') ||
+          key.startsWith('W3M') ||
+          key.startsWith('WALLETCONNECT')
+        );
+        wcKeys.forEach(key => {
+          console.log('Clearing cache:', key);
+          localStorage.removeItem(key);
+        });
+      } catch (e) {
+        console.warn('Failed to clear WalletConnect cache:', e);
+      }
+
       setWalletInfo('Not connected');
       showActionsSection(false);
       setFunctionInfo('');
       $('connectBtn').textContent = 'Connect wallet';
       $('contractInfo').classList.add('hidden'); // Hide contract info
       $('walletBalance').classList.add('hidden'); // Hide balance
+      $('claimsLink').style.display = 'none'; // Hide claims link
+      $('claimsPipe').style.display = 'none'; // Hide pipe
       provider = null;
       signer = null;
       contract = null;
     }
   });
 
-  // Function dropdown - only show/hide input fields, don't trigger actions
+  // Function dropdown - show/hide specific fields based on selection
   $('functionSelect').onchange = (e) => {
     const val = e.target.value;
-
-    $('setValueInput').classList.add('hidden');
     setFunctionInfo('');
 
-    if (val === 'set') {
-      $('setValueInput').classList.remove('hidden');
-      setFunctionInfo('Enter value, then click MotivateMe');
+    // Hide unlock date field
+    $('unlockDateInput').style.display = 'none';
+
+    // Update message input placeholder and show/hide fields based on motivation type
+    const messageInput = $('messageInput');
+
+    if (val === 'timelockedMotivation') {
+      $('unlockDateInput').style.display = 'block';
+      messageInput.placeholder = 'Message/description (optional, will be stored on blockchain)';
+      setFunctionInfo('Enter all fields, then click Motivate');
+    } else if (val === 'proofOfActionMotivation') {
+      messageInput.placeholder = 'Required action (e.g., "Post positive crypto message on Twitter")';
+      setFunctionInfo('Enter all fields, then click Motivate');
+    } else if (val === 'instantMotivation') {
+      messageInput.placeholder = 'Message/description (optional, will be stored on blockchain)';
+      setFunctionInfo('Enter recipient and amount, then click Motivate');
+    } else {
+      messageInput.placeholder = 'Message/description (will be stored on blockchain)';
     }
   };
 
@@ -253,96 +362,160 @@ window.initializeApp = async function(config) {
 
     console.log('');
     console.log('═══════════════════════════════════════════════');
-    console.log('📜 READING CONTRACT EVENT HISTORY FROM BLOCKCHAIN');
+    console.log('📜 CONTRACT STATISTICS (Overall, Not Personal)');
     console.log('═══════════════════════════════════════════════');
     console.log('');
 
     try {
       // Check if contract supports MotivateMe events
-      if (!contract.filters.Gifted) {
+      if (!contract.filters.InstantMotivation) {
         console.log('ℹ️ This contract does not emit MotivateMe events');
         console.log('   (Connected to Counter.sol or different contract)');
         console.log('');
         return;
       }
-      // Query all Gifted events
-      console.log('🎁 Querying all Gifted events...');
-      const giftedEvents = await contract.queryFilter(
-        contract.filters.Gifted()
+      // Query all InstantMotivation events
+      console.log('⚡ Querying all Instant Motivation events...');
+      const instantEvents = await contract.queryFilter(
+        contract.filters.InstantMotivation()
       );
-      console.log(`   Found ${giftedEvents.length} gift transactions`);
+      console.log(`   Found ${instantEvents.length} instant motivations`);
 
-      if (giftedEvents.length > 0) {
-        console.log('   Recent gifts:');
-        giftedEvents.slice(-5).forEach((event, i) => {
+      if (instantEvents.length > 0) {
+        console.log('   Recent instant motivations:');
+        instantEvents.slice(-5).forEach((event, i) => {
           console.log(`   ${i + 1}. ${event.args.sender} → ${event.args.recipient}`);
           console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          if (event.args.message) {
+            console.log(`      Message: "${event.args.message}"`);
+          }
           console.log(`      Block: ${event.blockNumber}`);
         });
       }
       console.log('');
 
-      // Query all PocketMoneyDeposited events
-      console.log('💰 Querying all PocketMoney deposits...');
-      const depositEvents = await contract.queryFilter(
-        contract.filters.PocketMoneyDeposited()
+      // Query all TimelockedMotivationCreated events
+      console.log('🔒 Querying all Time-locked Motivation deposits...');
+      const timelockedEvents = await contract.queryFilter(
+        contract.filters.TimelockedMotivationCreated()
       );
-      console.log(`   Found ${depositEvents.length} pocket money deposits`);
+      console.log(`   Found ${timelockedEvents.length} time-locked motivations`);
 
-      if (depositEvents.length > 0) {
-        console.log('   Recent deposits:');
-        depositEvents.slice(-5).forEach((event, i) => {
+      if (timelockedEvents.length > 0) {
+        console.log('   Recent time-locked motivations:');
+        timelockedEvents.slice(-5).forEach((event, i) => {
+          const unlockDate = new Date(event.args.unlockTimestamp * 1000).toISOString().split('T')[0];
           console.log(`   ${i + 1}. ${event.args.sender} → ${event.args.recipient}`);
           console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Unlock Date: ${unlockDate}`);
+          if (event.args.message) {
+            console.log(`      Message: "${event.args.message}"`);
+          }
           console.log(`      Block: ${event.blockNumber}`);
         });
       }
       console.log('');
 
-      // Query all PocketMoneyWithdrawn events
-      console.log('💸 Querying all PocketMoney withdrawals...');
-      const withdrawalEvents = await contract.queryFilter(
-        contract.filters.PocketMoneyWithdrawn()
+      // Query all TimelockedMotivationClaimed events
+      console.log('✅ Querying all Time-locked Motivation claims...');
+      const claimEvents = await contract.queryFilter(
+        contract.filters.TimelockedMotivationClaimed()
       );
-      console.log(`   Found ${withdrawalEvents.length} withdrawals`);
+      console.log(`   Found ${claimEvents.length} claims`);
 
-      if (withdrawalEvents.length > 0) {
-        console.log('   Recent withdrawals:');
-        withdrawalEvents.slice(-5).forEach((event, i) => {
-          console.log(`   ${i + 1}. ${event.args.recipient}`);
+      if (claimEvents.length > 0) {
+        console.log('   Recent claims:');
+        claimEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. Recipient: ${event.args.recipient}`);
+          console.log(`      From Sender: ${event.args.sender}`);
           console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
           console.log(`      Block: ${event.blockNumber}`);
         });
       }
       console.log('');
 
-      // Calculate statistics
+      // Query all ProofOfActionMotivationCreated events
+      console.log('📋 Querying all Proof-of-Action Motivations...');
+      const proofOfActionEvents = await contract.queryFilter(
+        contract.filters.ProofOfActionMotivationCreated()
+      );
+      console.log(`   Found ${proofOfActionEvents.length} proof-of-action motivations`);
+
+      if (proofOfActionEvents.length > 0) {
+        console.log('   Recent proof-of-action motivations:');
+        proofOfActionEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. ${event.args.sender} → ${event.args.recipient}`);
+          console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Action Required: "${event.args.actionRequired}"`);
+          if (event.args.message) {
+            console.log(`      Message: "${event.args.message}"`);
+          }
+          console.log(`      Block: ${event.blockNumber}`);
+        });
+      }
+      console.log('');
+
+      // Query all ProofOfActionClaimed events
+      console.log('✔️ Querying all Proof-of-Action claims...');
+      const proofClaimEvents = await contract.queryFilter(
+        contract.filters.ProofOfActionClaimed()
+      );
+      console.log(`   Found ${proofClaimEvents.length} proof-of-action claims`);
+
+      if (proofClaimEvents.length > 0) {
+        console.log('   Recent proof-of-action claims:');
+        proofClaimEvents.slice(-5).forEach((event, i) => {
+          console.log(`   ${i + 1}. Recipient: ${event.args.recipient}`);
+          console.log(`      From Sender: ${event.args.sender}`);
+          console.log(`      Amount: ${ethers.formatEther(event.args.amount)} ETH`);
+          console.log(`      Proof: "${event.args.proofDescription}"`);
+          console.log(`      Block: ${event.blockNumber}`);
+        });
+      }
+      console.log('');
+
+      // Calculate statistics (all from events)
       console.log('📊 CONTRACT STATISTICS:');
       console.log('═══════════════════════════════════════════════');
 
       // Unique recipients
       const allRecipients = new Set([
-        ...giftedEvents.map(e => e.args.recipient),
-        ...depositEvents.map(e => e.args.recipient)
+        ...instantEvents.map(e => e.args.recipient),
+        ...timelockedEvents.map(e => e.args.recipient),
+        ...proofOfActionEvents.map(e => e.args.recipient)
       ]);
       console.log(`   Total unique recipients: ${allRecipients.size}`);
+      console.log('');
 
-      // Total amounts
-      const totalGifted = giftedEvents.reduce((sum, e) => sum + e.args.amount, 0n);
-      const totalDeposited = depositEvents.reduce((sum, e) => sum + e.args.amount, 0n);
-      const totalWithdrawn = withdrawalEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      // Money sent (regardless of locked status)
+      const totalInstant = instantEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const totalTimelocked = timelockedEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const totalProofOfAction = proofOfActionEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      console.log('   💸 Money Sent:');
+      console.log(`   ├─ Total instant motivations: ${ethers.formatEther(totalInstant)} ETH`);
+      console.log(`   ├─ Total time-locked: ${ethers.formatEther(totalTimelocked)} ETH`);
+      console.log(`   └─ Total proof-of-action: ${ethers.formatEther(totalProofOfAction)} ETH`);
+      console.log('');
 
-      console.log(`   Total gifted: ${ethers.formatEther(totalGifted)} ETH`);
-      console.log(`   Total deposited: ${ethers.formatEther(totalDeposited)} ETH`);
-      console.log(`   Total withdrawn: ${ethers.formatEther(totalWithdrawn)} ETH`);
-      console.log(`   Locked in contract: ${ethers.formatEther(totalDeposited - totalWithdrawn)} ETH`);
+      // Money received/claimed by recipients
+      const totalTimelockedClaimed = claimEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const totalProofClaimed = proofClaimEvents.reduce((sum, e) => sum + e.args.amount, 0n);
+      const stillTimelockedLocked = totalTimelocked - totalTimelockedClaimed;
+      const stillProofLocked = totalProofOfAction - totalProofClaimed;
+      const totalLocked = stillTimelockedLocked + stillProofLocked;
 
-      // Contract balance (current state)
-      const contractBalance = await contract.getBalance();
-      console.log(`   Actual contract balance: ${ethers.formatEther(contractBalance)} ETH`);
+      console.log('   💰 Locked Motivations:');
+      console.log(`   ├─ Time-locked claimed: ${ethers.formatEther(totalTimelockedClaimed)} ETH`);
+      console.log(`   ├─ Time-locked unclaimed: ${ethers.formatEther(stillTimelockedLocked)} ETH`);
+      console.log(`   ├─ Proof-of-action claimed: ${ethers.formatEther(totalProofClaimed)} ETH`);
+      console.log(`   └─ Proof-of-action unclaimed: ${ethers.formatEther(stillProofLocked)} ETH`);
+      console.log('');
+
+      // Contract holds (calculated from events)
+      console.log(`   📦 Contract holds: ${ethers.formatEther(totalLocked)} ETH`);
 
       console.log('═══════════════════════════════════════════════');
-      console.log('✅ Event history loaded successfully!');
+      console.log('✅ Statistics loaded from blockchain events');
       console.log('');
 
     } catch (error) {
@@ -368,22 +541,17 @@ window.initializeApp = async function(config) {
     console.log('🔍 Reading contract event history...');
     await logContractEvents();
 
-    // Read doesn't need recipient validation, but increment and set do
-    if (val === 'read') {
-      await readCounter();
-    } else if (val === 'increment') {
-      await incrementCounter();
-    } else if (val === 'set') {
-      await setCounter();
+    // Call the appropriate function based on selection
+    if (val === 'instantMotivation') {
+      await sendInstantMotivation();
+    } else if (val === 'timelockedMotivation') {
+      await sendTimelockedMotivation();
+    } else if (val === 'proofOfActionMotivation') {
+      await sendProofOfActionMotivation();
     }
   };
 
-  // Set value input
-  $('valueInput').onkeypress = async (e) => {
-    if (e.key === 'Enter') {
-      await setCounter();
-    }
-  };
+  // (No valueInput handler needed anymore - removed)
 
   // Contract interaction functions
   async function updateBalance() {
@@ -391,7 +559,7 @@ window.initializeApp = async function(config) {
       const address = await signer.getAddress();
       const balance = await provider.getBalance(address);
       const balanceEth = ethers.formatEther(balance);
-      $('balanceAmount').textContent = `${balanceEth} ETH`;
+      $('balanceAmount').textContent = balanceEth;
       $('walletBalance').classList.remove('hidden');
     } catch (e) {
       console.error('Balance update failed:', e);
@@ -410,18 +578,140 @@ window.initializeApp = async function(config) {
     }
   }
 
-  async function incrementCounter() {
+  async function sendTimelockedMotivation() {
+    const btn = $('motivateBtn');
+    const originalText = btn.textContent;
+
     try {
       const recipient = getRecipientAddress();
       if (!recipient) {
         return; // Error message already set by getRecipientAddress()
       }
 
-      setFunctionInfo('Confirm transaction in your wallet...');
-      const tx = await contract.increment();
-      setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
+      // Get ETH amount
+      const ethAmount = getEthAmount();
+      if (!ethAmount) {
+        return; // Error message already set by getEthAmount()
+      }
+
+      // Get unlock date for time-locked motivation
+      const unlockTimestamp = getUnlockDate();
+      if (!unlockTimestamp) {
+        return; // Error message already set by getUnlockDate()
+      }
+
+      // Get message (optional)
+      const message = getMessage();
+
+      btn.disabled = true;
+      btn.textContent = 'Confirm in your wallet...';
+      setFunctionInfo(''); // Clear any error messages
+
+      // Call MotivateMe.sol timelockedMotivation function with unlock timestamp and message
+      const tx = await contract.timelockedMotivation(recipient, unlockTimestamp, message, { value: ethAmount });
+
+      btn.textContent = 'Confirming...';
       const rec = await tx.wait();
-      setFunctionInfo(`Confirmed in block ${rec.blockNumber}`);
+
+      // Check if transaction actually succeeded
+      if (rec.status === 0) {
+        throw new Error('Transaction failed on-chain');
+      }
+
+      // Show success state
+      btn.textContent = 'Success!';
+      setFunctionInfo(`✅ Time-locked motivation created in block ${rec.blockNumber}`);
+
+      // Wait 2 seconds before clearing and resetting
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        clearForm();
+      }, 2000);
+    } catch (e) {
+      console.error('Transaction error (full details):', e);
+
+      // Provide clearer error messages
+      let errorMsg = 'Transaction failed';
+
+      // Check for the misleading "User rejected" error
+      if (e.code === 'UNKNOWN_ERROR' && e.error?.message?.includes('User rejected')) {
+        // Check actual balance to see if it's really a balance issue
+        try {
+          const address = await signer.getAddress();
+          const balance = await provider.getBalance(address);
+          const balanceEth = ethers.formatEther(balance);
+
+          if (balance === 0n) {
+            errorMsg = `No funds for gas. Balance: 0 ETH`;
+          } else if (parseFloat(balanceEth) < 0.0001) {
+            errorMsg = `Low balance: ${balanceEth} ETH (need more for gas)`;
+          } else {
+            errorMsg = `Transaction rejected. Balance: ${balanceEth} ETH. Check wallet.`;
+          }
+        } catch (balanceError) {
+          errorMsg = 'Transaction rejected by wallet';
+        }
+      } else if (e.code === 'ACTION_REJECTED') {
+        errorMsg = 'You cancelled the transaction';
+      } else if (e.code === 'TIMEOUT' || e.message?.includes('timeout')) {
+        errorMsg = 'Confirmation timeout. Transaction may have succeeded - check counter.';
+      } else if (e.message) {
+        // Show first part of error, but suggest checking console for full details
+        const shortMsg = e.message.slice(0, 60);
+        errorMsg = e.message.length > 60 ? `${shortMsg}... (check console F12)` : e.message;
+      }
+
+      btn.textContent = originalText;
+      btn.disabled = false;
+      setFunctionInfo(`❌ Error: ${errorMsg}`);
+    }
+  }
+
+  async function sendInstantMotivation() {
+    const btn = $('motivateBtn');
+    const originalText = btn.textContent;
+
+    try {
+      const recipient = getRecipientAddress();
+      if (!recipient) {
+        return; // Error message already set by getRecipientAddress()
+      }
+
+      // Get ETH amount
+      const ethAmount = getEthAmount();
+      if (!ethAmount) {
+        return; // Error message already set by getEthAmount()
+      }
+
+      // Get message (optional)
+      const message = getMessage();
+
+      btn.disabled = true;
+      btn.textContent = 'Confirm in your wallet...';
+      setFunctionInfo(''); // Clear any error messages
+
+      // Call MotivateMe.sol instantMotivation function (instant transfer) with message
+      const tx = await contract.instantMotivation(recipient, message, { value: ethAmount });
+
+      btn.textContent = 'Confirming...';
+      const rec = await tx.wait();
+
+      // Check if transaction actually succeeded
+      if (rec.status === 0) {
+        throw new Error('Transaction failed on-chain');
+      }
+
+      // Show success state
+      btn.textContent = 'Success!';
+      setFunctionInfo(`✅ Instant motivation sent in block ${rec.blockNumber}`);
+
+      // Wait 2 seconds before clearing and resetting
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        clearForm();
+      }, 2000);
     } catch (e) {
       console.error('Transaction error (full details):', e);
 
@@ -460,25 +750,54 @@ window.initializeApp = async function(config) {
     }
   }
 
-  async function setCounter() {
+  async function sendProofOfActionMotivation() {
+    const btn = $('motivateBtn');
+    const originalText = btn.textContent;
+
     try {
       const recipient = getRecipientAddress();
       if (!recipient) {
         return; // Error message already set by getRecipientAddress()
       }
 
-      const val = $('valueInput').value;
-      if (!val) {
-        setFunctionInfo('Please enter a value');
+      // Get ETH amount
+      const ethAmount = getEthAmount();
+      if (!ethAmount) {
+        return; // Error message already set by getEthAmount()
+      }
+
+      // Get action required (using message field for proof-of-action)
+      const actionRequired = getMessage();
+      if (!actionRequired) {
+        setFunctionInfo('❌ Please describe the required action');
         return;
       }
-      setFunctionInfo(`Setting to ${val}... Confirm in your wallet`);
-      const tx = await contract.setNumber(BigInt(val));
-      setFunctionInfo(`Confirming... ${tx.hash.slice(0, 10)}...`);
+
+      btn.disabled = true;
+      btn.textContent = 'Confirm in your wallet...';
+      setFunctionInfo(''); // Clear any error messages
+
+      // Call MotivateMe.sol proofOfActionMotivation function with action required as both parameters
+      const tx = await contract.proofOfActionMotivation(recipient, actionRequired, actionRequired, { value: ethAmount });
+
+      btn.textContent = 'Confirming...';
       const rec = await tx.wait();
-      setFunctionInfo(`Set to ${val} in block ${rec.blockNumber}`);
-      $('valueInput').value = '';
-      $('setValueInput').classList.add('hidden');
+
+      // Check if transaction actually succeeded
+      if (rec.status === 0) {
+        throw new Error('Transaction failed on-chain');
+      }
+
+      // Show success state
+      btn.textContent = 'Success!';
+      setFunctionInfo(`✅ Proof-of-action motivation created in block ${rec.blockNumber}`);
+
+      // Wait 2 seconds before clearing and resetting
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        clearForm();
+      }, 2000);
     } catch (e) {
       console.error('Transaction error (full details):', e);
 
@@ -513,14 +832,283 @@ window.initializeApp = async function(config) {
         errorMsg = e.message.length > 60 ? `${shortMsg}... (check console F12)` : e.message;
       }
 
-      setFunctionInfo(`Error: ${errorMsg}`);
+      btn.textContent = originalText;
+      btn.disabled = false;
+      setFunctionInfo(`❌ Error: ${errorMsg}`);
     }
   }
 
   // Listen for account/chain changes
   if (window.ethereum) {
-    window.ethereum.on?.('chainChanged', () => location.reload());
-    window.ethereum.on?.('accountsChanged', () => location.reload());
+    window.ethereum.on?.('chainChanged', () => {
+      console.log('Chain changed - reloading page');
+      location.reload();
+    });
+    window.ethereum.on?.('accountsChanged', (accounts) => {
+      console.log('Account changed:', accounts);
+      console.log('Reloading page to refresh connection');
+      location.reload();
+    });
+  }
+
+  // Also listen to AppKit's provider events
+  const checkProviderEvents = () => {
+    const provider = modal.getWalletProvider();
+    if (provider?.on) {
+      provider.on('accountsChanged', (accounts) => {
+        console.log('WalletConnect account changed:', accounts);
+        location.reload();
+      });
+      provider.on('chainChanged', (chainId) => {
+        console.log('WalletConnect chain changed:', chainId);
+        location.reload();
+      });
+    }
+  };
+
+  // Set up provider event listeners after a short delay
+  setTimeout(checkProviderEvents, 1000);
+
+  // Claims Panel Functions
+  async function loadClaimableMotivations() {
+    const claimsLoading = $('claimsLoading');
+    const claimsList = $('claimsList');
+
+    if (!contract || !signer) {
+      claimsLoading.textContent = '⚠️ Please connect your wallet first.';
+      claimsList.innerHTML = '';
+      return;
+    }
+
+    claimsLoading.style.display = 'block';
+    claimsLoading.textContent = 'Loading your claimable motivations...';
+    claimsList.innerHTML = '';
+
+    try {
+      const myAddress = await signer.getAddress();
+      const claims = [];
+
+      // Query TimelockedMotivationCreated events where I'm the recipient
+      const timelockedEvents = await contract.queryFilter(
+        contract.filters.TimelockedMotivationCreated(null, myAddress)
+      );
+      console.log(`🔍 Found ${timelockedEvents.length} time-locked events`);
+
+      // Query ProofOfActionMotivationCreated events where I'm the recipient
+      const proofOfActionEvents = await contract.queryFilter(
+        contract.filters.ProofOfActionMotivationCreated(null, myAddress)
+      );
+      console.log(`🔍 Found ${proofOfActionEvents.length} proof-of-action events`);
+
+      // Check each time-locked motivation (now with array indices)
+      for (const event of timelockedEvents) {
+        const sender = event.args.sender;
+        const index = Number(event.args.index); // New: array index
+
+        // Get specific motivation from array
+        const lock = await contract.timeLocks(myAddress, sender, index);
+
+        console.log(`Time-locked from ${sender} [${index}]:`, {
+          amount: ethers.formatEther(lock.amount),
+          claimed: lock.claimed,
+          unlockTimestamp: lock.unlockTimestamp
+        });
+
+        if (lock.amount > 0n && !lock.claimed) {
+          const now = Math.floor(Date.now() / 1000);
+          const unlockDate = new Date(Number(lock.unlockTimestamp) * 1000);
+          const isUnlocked = now >= Number(lock.unlockTimestamp);
+          const daysRemaining = Math.ceil((Number(lock.unlockTimestamp) - now) / 86400);
+
+          claims.push({
+            type: 'timelocked',
+            sender,
+            index, // Include index for claiming
+            amount: lock.amount,
+            unlockTimestamp: lock.unlockTimestamp,
+            unlockDate: unlockDate.toISOString().split('T')[0],
+            isUnlocked,
+            daysRemaining,
+            message: event.args.message
+          });
+        }
+      }
+      const timelockedCount = claims.length;
+      console.log(`✅ Processed time-locked: added ${timelockedCount} claims`);
+
+      // Check each proof-of-action motivation (now with array indices)
+      for (const event of proofOfActionEvents) {
+        const sender = event.args.sender;
+        const index = Number(event.args.index); // New: array index
+
+        // Get specific motivation from array
+        const poa = await contract.proofOfActions(myAddress, sender, index);
+
+        console.log(`Proof-of-Action from ${sender} [${index}]:`, {
+          amount: ethers.formatEther(poa.amount),
+          claimed: poa.claimed,
+          actionRequired: poa.actionRequired,
+          eventAction: event.args.actionRequired
+        });
+
+        // Only show if not claimed
+        if (poa.amount > 0n && !poa.claimed) {
+          claims.push({
+            type: 'proofOfAction',
+            sender,
+            index, // Include index for claiming
+            amount: poa.amount,
+            actionRequired: poa.actionRequired,
+            message: event.args.actionRequired !== event.args.message ? event.args.message : null
+          });
+        }
+      }
+      const proofCount = claims.length - timelockedCount;
+      console.log(`✅ Processed proof-of-action: added ${proofCount} claims`);
+
+      claimsLoading.style.display = 'none';
+
+      console.log(`📊 Total claimable motivations found: ${claims.length}`);
+      claims.forEach((c, i) => {
+        console.log(`  ${i + 1}. ${c.type} from ${c.sender.slice(0, 10)}... - ${ethers.formatEther(c.amount)} ETH`);
+      });
+
+      if (claims.length === 0) {
+        claimsList.innerHTML = '<p style="color: #666;">You have no claimable motivations at this time.</p>';
+        return;
+      }
+
+      // Display claims
+      claims.forEach((claim, index) => {
+        const card = document.createElement('div');
+        card.className = 'claim-card';
+        card.id = `claim-${index}`;
+
+        let html = `<div class="claim-card-header">From: ${claim.sender.slice(0, 10)}...${claim.sender.slice(-8)}</div>`;
+        html += `<div class="claim-card-detail">💰 Amount: ${ethers.formatEther(claim.amount)} ETH</div>`;
+
+        if (claim.message) {
+          html += `<div class="claim-card-detail">📝 "${claim.message}"</div>`;
+        }
+
+        if (claim.type === 'timelocked') {
+          html += `<div class="claim-card-detail">📅 Unlock Date: ${claim.unlockDate}</div>`;
+          if (claim.isUnlocked) {
+            html += `<div class="claim-card-status status-ready">✅ Ready to claim!</div>`;
+            html += `<div id="claim-message-${index}" style="margin-top: 8px; font-size: 14px; text-align: center;"></div>`;
+            html += `<button class="claim-btn" onclick="window.claimTimelocked('${claim.sender}', ${claim.index}, ${index})">Claim Now</button>`;
+          } else {
+            html += `<div class="claim-card-status status-locked">🔒 Locked (${claim.daysRemaining} days remaining)</div>`;
+            html += `<div id="claim-message-${index}" style="margin-top: 8px; font-size: 14px; text-align: center;"></div>`;
+            html += `<button class="claim-btn" disabled>Claim</button>`;
+          }
+        } else if (claim.type === 'proofOfAction') {
+          html += `<div class="claim-card-detail">📋 Action: "${claim.actionRequired}"</div>`;
+          html += `<div class="claim-card-status status-ready">✅ Ready to claim (provide proof)</div>`;
+          html += `<textarea id="proof-${index}" class="proof-input" placeholder="Describe what you did (e.g., Twitter link or description)..." rows="3"></textarea>`;
+          html += `<div id="claim-message-${index}" style="margin-top: 8px; font-size: 14px; text-align: center;"></div>`;
+          html += `<button class="claim-btn" onclick="window.claimProofOfAction('${claim.sender}', ${claim.index}, ${index})">Submit Proof & Claim</button>`;
+        }
+
+        card.innerHTML = html;
+        claimsList.appendChild(card);
+      });
+
+    } catch (error) {
+      console.error('Error loading claims:', error);
+      claimsLoading.textContent = '❌ Error loading claims. Check console for details.';
+    }
+  }
+
+  // Claim time-locked motivation
+  window.claimTimelocked = async function(sender, contractIndex, displayIndex) {
+    const btn = document.querySelector(`#claim-${displayIndex} button`);
+    const messageDiv = document.getElementById(`claim-message-${displayIndex}`);
+    const originalText = btn.textContent;
+
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Confirm in your wallet...';
+      messageDiv.textContent = '';
+
+      // Pass contract index (from array) to claim function
+      const tx = await contract.claimTimelockedMotivation(sender, contractIndex);
+      btn.textContent = 'Confirming...';
+      const receipt = await tx.wait();
+
+      // Show success message above button (green checkbox, black text)
+      btn.textContent = originalText;
+      messageDiv.textContent = `✅ Time-locked motivation claimed in block ${receipt.blockNumber}`;
+      messageDiv.style.color = '#000'; // Black text (checkbox is naturally green)
+
+      // Wait 20 seconds before reloading claims (user can close modal anytime)
+      setTimeout(() => {
+        btn.disabled = false;
+        messageDiv.textContent = '';
+        loadClaimableMotivations();
+      }, 20000);
+    } catch (error) {
+      console.error('Claim error:', error);
+      btn.disabled = false;
+      btn.textContent = originalText;
+      messageDiv.textContent = '';
+      alert(`Error: ${error.message || 'Claim failed'}`);
+    }
+  };
+
+  // Claim proof-of-action motivation
+  window.claimProofOfAction = async function(sender, contractIndex, displayIndex) {
+    const btn = document.querySelector(`#claim-${displayIndex} button`);
+    const messageDiv = document.getElementById(`claim-message-${displayIndex}`);
+    const originalText = btn.textContent;
+
+    try {
+      const proofInput = document.getElementById(`proof-${displayIndex}`);
+      const proof = proofInput.value.trim();
+
+      if (!proof) {
+        alert('Please provide a description of what you did.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Confirm in your wallet...';
+      messageDiv.textContent = '';
+
+      // Pass contract index (from array) to claim function
+      const tx = await contract.claimProofOfAction(sender, contractIndex, proof);
+      btn.textContent = 'Confirming...';
+      const receipt = await tx.wait();
+
+      // Show success message above button (green checkbox, black text)
+      btn.textContent = originalText;
+      messageDiv.textContent = `✅ Proof-of-action motivation claimed in block ${receipt.blockNumber}`;
+      messageDiv.style.color = '#000'; // Black text (checkbox is naturally green)
+
+      // Wait 20 seconds before reloading claims (user can close modal anytime)
+      setTimeout(() => {
+        btn.disabled = false;
+        messageDiv.textContent = '';
+        loadClaimableMotivations();
+      }, 20000);
+    } catch (error) {
+      console.error('Claim error:', error);
+      btn.disabled = false;
+      btn.textContent = originalText;
+      messageDiv.textContent = '';
+      alert(`Error: ${error.message || 'Claim failed'}`);
+    }
+  };
+
+  // Make loadClaimableMotivations globally accessible
+  window.loadClaimableMotivations = loadClaimableMotivations;
+
+  // Add listener to load claims when panel opens
+  const claimsLink = $('claimsLink');
+  if (claimsLink) {
+    claimsLink.addEventListener('click', () => {
+      setTimeout(() => loadClaimableMotivations(), 100);
+    });
   }
 
   console.log('✅ App initialized');

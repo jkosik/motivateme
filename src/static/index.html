@@ -165,6 +165,7 @@
     .row {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 16px;
       margin-bottom: 8px;
     }
@@ -172,7 +173,7 @@
     .info {
       color: #6b7280;
       font-size: 14px;
-      flex: 1;
+      flex-shrink: 0;
     }
 
     .info.connected {
@@ -207,6 +208,63 @@
       cursor: not-allowed;
     }
 
+    .apply-btn {
+      padding: 12px 16px;
+      background: #0066ff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      min-width: auto;
+    }
+
+    .apply-btn:hover {
+      background: #0052cc;
+    }
+
+    /* Toggle Switch */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-container input[type="checkbox"] {
+      display: none;
+    }
+
+    .toggle-slider {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #e5e7eb;
+      border-radius: 24px;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .toggle-container input[type="checkbox"]:checked + .toggle-slider {
+      background: #0066ff;
+    }
+
+    .toggle-container input[type="checkbox"]:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
     select {
       background: #fff;
       color: #1a1a1a;
@@ -216,12 +274,13 @@
       font-size: 15px;
       cursor: pointer;
       transition: all 0.15s ease;
-      min-width: 140px;
+      width: 100%;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231a1a1a' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 12px center;
       padding-right: 36px;
+      margin-bottom: 12px;
     }
 
     select:hover {
@@ -310,25 +369,34 @@
         </div>
 
         <div class="section hidden" id="actionsSection">
-          <div class="row">
-            <input type="text" id="recipientInput" placeholder="Recipient's address (0x...)" />
-          </div>
-          <div class="row">
-            <select id="functionSelect">
-              <option value="">Select Motivation</option>
-              <option value="read">Read counter</option>
-              <option value="increment">Increment +1</option>
-              <option value="set">Set value</option>
-            </select>
-            <div class="info" id="functionInfo">—</div>
-          </div>
+          <input type="text" id="recipientInput" placeholder="Recipient's address (0x...)" />
+          <select id="functionSelect">
+            <option value="">Select Motivation</option>
+            <option value="read">Read counter</option>
+            <option value="increment">Increment +1</option>
+            <option value="set">Set value</option>
+          </select>
           <div id="setValueInput" class="hidden">
             <input type="number" id="valueInput" placeholder="Enter value" />
           </div>
+          <div class="info" id="functionInfo" style="text-align: center; margin-top: 12px; font-size: 14px;"></div>
         </div>
 
-        <div class="contract-info">
-          <div>Contract address</div>
+        <div class="contract-info hidden" id="contractInfo">
+          <div style="margin-bottom: 12px;">
+            <label class="toggle-container">
+              <span style="font-size: 14px; color: #1a1a1a; margin-right: 8px;">Use custom contract</span>
+              <input type="checkbox" id="customContractToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="customContractInput" class="hidden" style="margin-bottom: 12px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="customContractAddr" placeholder="Enter contract address (0x...)" style="flex: 1; font-family: monospace; margin-bottom: 0;" />
+              <button id="applyCustomContract" class="apply-btn">Apply</button>
+            </div>
+          </div>
+          <div style="margin-bottom: 4px; font-size: 12px; color: #8c8c8c;">Active contract address:</div>
           <a id="contractAddr" class="contract-address" href="#" target="_blank" rel="noopener noreferrer"></a>
           <div id="walletBalance" class="hidden" style="margin-top: 8px;">
             <div style="font-size: 12px; color: #8c8c8c;">Wallet balance of native ETH (full precision)</div>
@@ -395,9 +463,20 @@
     // const ACTIVE_NETWORK = INK_SEPOLIA;
     const ACTIVE_NETWORK = INK_MAINNET;
 
-    // Address is based on nonce (transaction count) and Deployer address. If we use fresh new wallet, nonce is 0
-    // and the address is the same on Testnet and Mainnet.
-    const CONTRACT_ADDRESS = '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF';
+    // Multiple contract addresses - add more as needed
+    const CONTRACT_ADDRESSES = {
+      'default': {
+        name: 'Default Contract',
+        address: '0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF'
+      },
+      'alternative': {
+        name: 'Alternative Contract',
+        address: '0x0000000000000000000000000000000000000000' // Replace with actual address
+      }
+    };
+
+    // Default contract address
+    const CONTRACT_ADDRESS = CONTRACT_ADDRESSES['default'].address;
 
     // WalletConnect v2 Project ID from https://dashboard.reown.com
     const WALLETCONNECT_PROJECT_ID = 'd608436759f83467578a0fda722d7542';
@@ -417,6 +496,7 @@
         window.initializeApp({
           ACTIVE_NETWORK,
           CONTRACT_ADDRESS,
+          CONTRACT_ADDRESSES,
           ABI,
           WALLETCONNECT_PROJECT_ID
         });

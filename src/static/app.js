@@ -4,17 +4,61 @@ import { ethers } from 'ethers'
 
 // Configuration will be injected from HTML
 window.initializeApp = async function(config) {
-  const { ACTIVE_NETWORK, CONTRACT_ADDRESS, ABI, WALLETCONNECT_PROJECT_ID } = config;
+  const { ACTIVE_NETWORK, CONTRACT_ADDRESS, CONTRACT_ADDRESSES, ABI, WALLETCONNECT_PROJECT_ID } = config;
 
   // State
   let provider, signer, contract, modal;
+  let currentContractAddress = CONTRACT_ADDRESS;
 
   const $ = (id) => document.getElementById(id);
 
-  // Set contract address link
-  const explorerUrl = `${ACTIVE_NETWORK.blockExplorerUrls[0]}/address/${CONTRACT_ADDRESS}`;
-  $('contractAddr').textContent = CONTRACT_ADDRESS;
-  $('contractAddr').href = explorerUrl;
+  // Function to update contract address and link
+  function updateContractAddress(address) {
+    currentContractAddress = address;
+    const explorerUrl = `${ACTIVE_NETWORK.blockExplorerUrls[0]}/address/${address}`;
+    $('contractAddr').textContent = address;
+    $('contractAddr').href = explorerUrl;
+
+    // Reinitialize contract if provider exists
+    if (provider && signer) {
+      contract = new ethers.Contract(currentContractAddress, ABI, signer);
+      console.log('📝 Contract updated to:', currentContractAddress);
+    }
+  }
+
+  // Set initial contract address link
+  updateContractAddress(CONTRACT_ADDRESS);
+
+  // Handle toggle button for custom contract
+  const customContractToggle = $('customContractToggle');
+  const customContractInput = $('customContractInput');
+  const customContractAddr = $('customContractAddr');
+  const applyCustomContract = $('applyCustomContract');
+
+  customContractToggle.addEventListener('change', () => {
+    if (customContractToggle.checked) {
+      // Toggle ON - show custom contract input
+      customContractInput.classList.remove('hidden');
+    } else {
+      // Toggle OFF - hide custom contract input and revert to default
+      customContractInput.classList.add('hidden');
+      customContractAddr.value = ''; // Clear the input
+      updateContractAddress(CONTRACT_ADDRESS);
+    }
+  });
+
+  // Handle Apply button for custom contract
+  applyCustomContract.addEventListener('click', () => {
+    const address = customContractAddr.value.trim();
+    if (isValidContractPrefix(address)) {
+      updateContractAddress(address);
+      setFunctionInfo('Custom contract applied');
+      setTimeout(() => setFunctionInfo(''), 3000); // Clear message after 3 seconds
+    } else {
+      setFunctionInfo('Invalid address: must start with 0x');
+      setTimeout(() => setFunctionInfo(''), 3000); // Clear message after 3 seconds
+    }
+  });
 
   // Update page title
   document.title = `MotivateMe · ${ACTIVE_NETWORK.chainName}`;
@@ -81,12 +125,16 @@ window.initializeApp = async function(config) {
     return address && /^0x[a-fA-F0-9]{40}$/.test(address);
   }
 
+  function isValidContractPrefix(address) {
+    return address && address.startsWith('0x');
+  }
+
   // Initialize provider and contract after connection
   async function initContract(walletProvider) {
     try {
       provider = new ethers.BrowserProvider(walletProvider);
       signer = await provider.getSigner();
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      contract = new ethers.Contract(currentContractAddress, ABI, signer);
       const acct = await signer.getAddress();
       const net = await provider.getNetwork();
 
@@ -97,8 +145,9 @@ window.initializeApp = async function(config) {
 
       setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);
       showActionsSection(true);
-      setFunctionInfo('—'); // Clear function info when connected
+      setFunctionInfo(''); // Clear function info when connected
       $('connectBtn').textContent = 'Wallet';
+      $('contractInfo').classList.remove('hidden'); // Show contract info
       await updateBalance(); // Update balance in footer
       console.log('✅ Wallet connected:', acct);
     } catch (e) {
@@ -136,8 +185,9 @@ window.initializeApp = async function(config) {
       console.log('Wallet disconnected');
       setWalletInfo('Not connected');
       showActionsSection(false);
-      setFunctionInfo('—');
+      setFunctionInfo('');
       $('connectBtn').textContent = 'Connect wallet';
+      $('contractInfo').classList.add('hidden'); // Hide contract info
       $('walletBalance').classList.add('hidden'); // Hide balance
       provider = null;
       signer = null;
@@ -152,7 +202,7 @@ window.initializeApp = async function(config) {
     $('setValueInput').classList.add('hidden');
 
     if (!val) {
-      setFunctionInfo('—');
+      setFunctionInfo('');
       return;
     }
 

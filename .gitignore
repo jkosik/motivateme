@@ -1,6 +1,5 @@
 node_modules/
 dist/
-*.log
 
 # Ansible logs
 *.log
@@ -19,14 +18,8 @@ ansible-ssh-*
 *.tar.gz
 *.zip
 
-# Local inventory overrides
-inventory/local_*.yml
-
 # Vault password files
 .vault_pass
 vault_pass.txt
 
-# Backup files
-*.bak
-*~
 

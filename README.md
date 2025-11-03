@@ -6,14 +6,26 @@ Counter dApp on Ink blockchain with WalletConnect v2 support.
 ## Project Structure
 ```
 .
-├── contract-foundry/    # Smart Contract code
-├── src/                 # App source code
-│   ├── static/
-│   │   └── index.html
-│   └── main.go          # Go web server
-├── dist/                # AppKit build files (build by npms)
-├── package.json         # npm dependencies
-└── vite.config.js       # Build configuration
+├── ansible/             # Ansible playbooks for K3s deployment
+│   ├── inventory/       # Server inventory
+│   ├── roles/           # Ansible roles (common, k3s)
+│   ├── playbook.yml     # Main deployment playbook
+│   └── README.md        # Deployment guide
+├── app/                 # Application code
+│   ├── package.json     # NPM dependencies for frontend build
+│   ├── vite.config.js   # Vite build configuration
+│   ├── dist/            # Built frontend (output by Vite)
+│   └── src/
+│       ├── static/      # Frontend source
+│       │   ├── index.html
+│       │   ├── app.js
+│       │   └── logo.png
+│       └── main.go      # Go web server
+└── contract-foundry/    # Smart Contract code
+    └── forge/
+        └── src/
+            ├── Counter.sol
+            └── MotivateMe.sol
 ```
 
 
@@ -66,22 +78,14 @@ export WALLET_PRIVATE_KEY=
 
 For contract deployment we need some ETH. For testnet, use: https://docs.inkonchain.com/tools/faucets. For mainnet, trasfer from exchange or use Ink Bridge: https://inkonchain.com/bridge
 
-Check wallet balance (balance is in Wei - 10^-18 ETH):
+Check wallet balance (balance defaults to Wei - 10^-18 ETH). Contract balance can be checked the same ways.
 ```
 cast balance $WALLET_ADDRESS --rpc-url https://ink-sepolia.drpc.org [--ether]
 cast balance $WALLET_ADDRESS --rpc-url https://rpc-gel.inkonchain.com [--ether]
 ```
 
 ### Deploy the contract to Testnet
-Note: There are safer ways of handling private key using forge keystore.
-Dry-run:
-```
-forge create src/Counter.sol:Counter \
-  --rpc-url "https://ink-sepolia.drpc.org" \
-  --private-key $WALLET_PRIVATE_KEY
-```
-
-Deployment:
+Note: There are safer ways of handling private key using forge keystore. To dry-run, omit `--broadcast`
 ```
 forge create src/Counter.sol:Counter \
   --rpc-url "https://ink-sepolia.drpc.org" \
@@ -96,6 +100,33 @@ Transaction hash: 0x5ec7e54d85e9314c1f971b5d9fa8234fe04c1b36ea9a7543f287e5d88a8d
 
 Check the contract and transaction:
 - https://explorer-sepolia.inkonchain.com/address/0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
+
+
+### Interact with contract
+Read the variable `number` from the contract:
+```
+cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
+0
+```
+
+Call a function and increment the `number` value
+```
+cast send 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "increment()" \
+  --rpc-url https://ink-sepolia.drpc.org \
+  --private-key $WALLET_PRIVATE_KEY
+contractAddress
+cumulativeGasUsed    12378464
+effectiveGasPrice    253
+from                 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
+gasUsed              43482
+logs                 []
+...SNIPPED...
+```
+
+```
+cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
+1
+```
 
 ### Deploy the contract to Mainnet
 ```
@@ -119,90 +150,86 @@ Contract address is a result of the private key and the nonce (sequential number
 If we use new wallet and deploy the contract as a first transaction on Testnet and also on Mainnet, both contracts will have the same address on both chains.
 
 
-**MotivateMe contract:**
+### Final MotivateMe contract with verification
 ```
-forge create src/MotivateMe.sol:MotivateMe \
+forge create src/MotivateMe-v3.sol:MotivateMe \
   --rpc-url "https://rpc-gel.inkonchain.com" \
   --private-key $WALLET_PRIVATE_KEY \
   --broadcast
 [⠊] Compiling...
-[⠒] Compiling 1 files with Solc 0.8.30
-[⠢] Solc 0.8.30 finished in 34.21ms
-Compiler run successful!
+No files changed, compilation skipped
 Deployer: 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
-Deployed to: 0xDe3FabeD53AE4D7d90C385621EcdEdc795189ea3
-Transaction hash: 0xb0ff21a2e00d7eaf1628a599c587960fe3b2936a5a327353ed80cc1a4e98d357
+Deployed to: 0x6a5d3Cd30EfC58C8A864f6536D350521ADAd6f64
+Transaction hash: 0x5011169bf0feec7e51e788b2d86503a049680de94d5951b717bb91ea677e9c6f
+
+forge verify-contract \
+  --chain-id 57073 \
+  --verifier blockscout \
+  --verifier-url https://explorer.inkonchain.com/api/ \
+  --watch \
+  0x6a5d3Cd30EfC58C8A864f6536D350521ADAd6f64 \
+  src/MotivateMe-v3.sol:MotivateMe
 ```
 
 Check the contract and transaction:
-- https://explorer.inkonchain.com/address/0x1913E1cdA0814fa2aF01d7637caB81d088a43183
+- https://explorer.inkonchain.com/address/0x6a5d3Cd30EfC58C8A864f6536D350521ADAd6f64
 
-### Interact with contract
-Read the variable `number` from the contract:
-```
-cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
-0
-```
-
-Call a function and increment the `number` value
-```
-cast send 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "increment()" \
-  --rpc-url https://ink-sepolia.drpc.org \
-  --private-key $WALLET_PRIVATE_KEY
-contractAddress
-cumulativeGasUsed    12378464
-effectiveGasPrice    253
-from                 0x6CdeD5FbefBaAa5A5e885ED7D854c2fBb34bd598
-gasUsed              43482
-logs                 []
-logsBloom            0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-root
-status               1 (success)
-transactionHash      0xfd0adaed8632985befd7583e84615094b4dbb5a38ef07e9f672b140247c77923
-transactionIndex     2
-type                 2
-blobGasPrice
-blobGasUsed
-to                   0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF
-l1BaseFeeScalar      801949
-l1BlobBaseFee        1
-l1BlobBaseFeeScalar  0
-l1Fee                11548
-l1GasPrice           9
-l1GasUsed            1600
-```
-
-```
-cast call 0x4fcC5C461B59ECC4786CDa6Ec270bA29Eb657FAF "number()(uint256)" --rpc-url https://ink-sepolia.drpc.org
-1
-```
 
 ## Build and run the app
-`src/dist/` holds `@reown/appkit` NPM-built code
+
+The `app/dist/` directory holds the Vite-built frontend code (bundled Reown AppKit, ethers.js, etc.)
 
 ```bash
-cd src/
+# Build frontend
+cd app/
 npm install
 npm run build
 
+# Run Go server (serves from app/dist/)
+cd src/
 go run main.go
-#or
+
+# Or for development (Vite dev server)
+cd app/
 npm run dev
 ```
 
 ## Configuration
 ### Network Selection
-Edit `src/static/index.html`:
+Edit `app/src/static/index.html`:
 ```javascript
 const ACTIVE_NETWORK = INK_SEPOLIA;  // or INK_MAINNET. INK_SEPOLIA seems not supporting write operations for contracts
 ```
 
 ### Contract Address
-Edit `src/static/index.html`:
+Edit `app/src/static/index.html`:
 ```javascript
 const CONTRACT_ADDRESS = '0x...';
 ```
 
+## Production Deployment
+
+### Automated K3s Deployment with Ansible
+
+For production deployment on Hetzner (or any Ubuntu 24.04 VM), use the provided Ansible playbooks.
+
+**Quick Start:**
+
+```bash
+cd ansible
+
+# 1. Edit inventory and set your VM's IP
+nano inventory/hosts.yml
+
+# 2. Run playbook
+ansible-playbook -i inventory/hosts.yml playbook.yml
+
+# 3. SSH to VM - kubectl ready immediately
+ssh root@YOUR_VM_IP
+kubectl get nodes
+```
+
+**Full documentation:** [`ansible/README.md`](ansible/README.md)
 
 ## Further notes
 ### Transaction, View, Event

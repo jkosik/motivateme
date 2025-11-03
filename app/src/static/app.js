@@ -50,12 +50,12 @@ window.initializeApp = async function(config) {
   // Handle Apply button for custom contract
   applyCustomContract.addEventListener('click', () => {
     const address = customContractAddr.value.trim();
-    if (isValidContractPrefix(address)) {
+    if (isValidContractAddress(address)) {
       updateContractAddress(address);
       setFunctionInfo('Custom contract applied');
       setTimeout(() => setFunctionInfo(''), 3000); // Clear message after 3 seconds
     } else {
-      setFunctionInfo('Invalid address: must start with 0x');
+      setFunctionInfo('Invalid address: must be valid Ethereum address (0x...)');
       setTimeout(() => setFunctionInfo(''), 3000); // Clear message after 3 seconds
     }
   });
@@ -222,8 +222,17 @@ window.initializeApp = async function(config) {
     }
   }
 
-  function isValidContractPrefix(address) {
-    return address && address.startsWith('0x');
+  function isValidContractAddress(address) {
+    if (!address || typeof address !== 'string') {
+      return false;
+    }
+
+    try {
+      // ethers.isAddress validates format AND checksum
+      return ethers.isAddress(address);
+    } catch (e) {
+      return false;
+    }
   }
 
   // Clear form inputs after successful transaction
@@ -1036,6 +1045,11 @@ window.initializeApp = async function(config) {
       btn.textContent = 'Confirming...';
       const receipt = await tx.wait();
 
+      // Check if transaction actually succeeded
+      if (receipt.status === 0) {
+        throw new Error('Transaction failed on-chain');
+      }
+
       // Show success message above button (green checkbox, black text)
       btn.textContent = originalText;
       messageDiv.textContent = `✅ Time-locked motivation claimed in block ${receipt.blockNumber}`;
@@ -1079,6 +1093,11 @@ window.initializeApp = async function(config) {
       const tx = await contract.claimProofOfAction(sender, contractIndex, proof);
       btn.textContent = 'Confirming...';
       const receipt = await tx.wait();
+
+      // Check if transaction actually succeeded
+      if (receipt.status === 0) {
+        throw new Error('Transaction failed on-chain');
+      }
 
       // Show success message above button (green checkbox, black text)
       btn.textContent = originalText;

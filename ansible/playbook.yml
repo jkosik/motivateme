@@ -1,0 +1,45 @@
+---
+# MotivateMe K3s Deployment Playbook
+# Deploys K3s on Ubuntu 24.04 with security hardening for Hetzner VM
+#
+# Usage:
+#   1. Edit inventory/hosts.yml and set ansible_host to your VM's public IP
+#   2. Run: ansible-playbook -i inventory/hosts.yml playbook.yml
+#   3. Get kubeconfig: scp root@YOUR_VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config
+#      Then edit ~/.kube/config and replace 127.0.0.1 with your VM IP for remote access
+
+- name: Setup MotivateMe K3s Cluster
+  hosts: k3s_cluster
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 300
+
+    - name: Gather system facts
+      setup:
+
+  roles:
+    - common
+    - k3s
+
+  post_tasks:
+    - name: Display K3s access information
+      debug:
+        msg:
+          - "==================================================================="
+          - "K3s cluster setup complete!"
+          - "==================================================================="
+          - "Hostname: {{ target_hostname }}"
+          - "K3s API: Accessible only from localhost (127.0.0.1:6443)"
+          - "K3s Ingress: Accessible externally on ports 80/443"
+          - ""
+          - "To access K3s from your local machine:"
+          - "  scp root@{{ ansible_host }}:/etc/rancher/k3s/k3s.yaml ~/.kube/config"
+          - "  # Edit ~/.kube/config and replace 127.0.0.1 with {{ ansible_host }}"
+          - ""
+          - "Test ingress: kubectl get svc -n kube-system traefik"
+          - "==================================================================="
+

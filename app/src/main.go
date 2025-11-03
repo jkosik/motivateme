@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	// Serve built files from ../dist
+	// Serve built files from app/dist
 	fs := http.FileServer(http.Dir("../dist"))
 	http.Handle("/", fs)
 

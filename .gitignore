@@ -2,3 +2,31 @@ node_modules/
 dist/
 *.log
 
+# Ansible logs
+*.log
+ansible.log
+
+# Retry files
+*.retry
+
+# Fact cache
+ansible_facts/
+
+# SSH control paths
+ansible-ssh-*
+
+# Downloaded files
+*.tar.gz
+*.zip
+
+# Local inventory overrides
+inventory/local_*.yml
+
+# Vault password files
+.vault_pass
+vault_pass.txt
+
+# Backup files
+*.bak
+*~
+

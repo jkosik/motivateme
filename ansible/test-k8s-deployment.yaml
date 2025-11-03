@@ -1,0 +1,66 @@
+---
+# Test deployment to verify K3s ingress is working
+# Deploy: kubectl apply -f test-k8s-deployment.yaml
+# Test: curl -H "Host: test.YOUR_VM_IP.nip.io" http://YOUR_VM_IP
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-app
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-test
+  namespace: test-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-test
+  template:
+    metadata:
+      labels:
+        app: nginx-test
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-test
+  namespace: test-app
+spec:
+  selector:
+    app: nginx-test
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-test
+  namespace: test-app
+  annotations:
+    kubernetes.io/ingress.class: traefik  # Change to 'nginx' if using nginx-ingress
+spec:
+  rules:
+  - host: test.example.com  # Replace with your domain or use nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-test
+            port:
+              number: 80
+

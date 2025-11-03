@@ -1,0 +1,126 @@
+---
+# Common system setup tasks
+
+- name: Set hostname
+  hostname:
+    name: "{{ target_hostname }}"
+  when: target_hostname is defined
+
+- name: Update /etc/hosts with new hostname
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ target_hostname }}"
+    state: present
+  when: target_hostname is defined
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install essential packages
+  apt:
+    name:
+      - jq
+      - git
+      - curl
+      - wget
+      - ufw
+      - ca-certificates
+      - apt-transport-https
+      - software-properties-common
+    state: present
+
+- name: Ensure UFW is installed and enabled
+  service:
+    name: ufw
+    state: started
+    enabled: yes
+
+- name: Configure UFW - Default deny incoming
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Configure UFW - Default allow outgoing
+  ufw:
+    state: enabled
+    policy: allow
+    direction: outgoing
+
+- name: Allow SSH through firewall
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    comment: 'SSH for remote management'
+
+- name: Allow HTTP through firewall
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'HTTP for K3s Ingress'
+
+- name: Allow HTTPS through firewall
+  ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+    comment: 'HTTPS for K3s Ingress'
+
+- name: Block K3s API port from external access
+  ufw:
+    rule: deny
+    port: '6443'
+    proto: tcp
+    from_ip: any
+    comment: 'Block K3s API from external access'
+
+- name: Block K3s metrics port from external access
+  ufw:
+    rule: deny
+    port: '10250'
+    proto: tcp
+    from_ip: any
+    comment: 'Block K3s kubelet metrics'
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Disable swap (required for Kubernetes)
+  shell: |
+    swapoff -a
+    sed -i '/ swap / s/^/#/' /etc/fstab
+  args:
+    warn: false
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Ensure kernel modules load on boot
+  copy:
+    dest: /etc/modules-load.d/k3s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Set sysctl parameters for Kubernetes
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+

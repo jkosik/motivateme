@@ -1,6 +1,6 @@
 # MotivateMe
 
-dApp on Ink blockchain which allows user to send money directly or conditionally using Smart Contract.
+Decentralised application on Ink blockchain which allows users to send money directly or conditionally using Smart Contract.
 
 ## How to build Smart Contract
 Use Foundry to interact with Ethereum network (L1/L2).

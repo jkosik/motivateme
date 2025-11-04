@@ -1,6 +1,15 @@
 # MotivateMe
 
-Decentralised application on Ink blockchain which allows users to send money directly or conditionally using Smart Contract.
+Playground dApp (decentralised application) on Ink blockchain which allows users to send money directly or conditionally using Smart Contract.
+
+## ⚠️ Disclaimer
+
+**This project is an independent, educational application and is NOT affiliated with, endorsed by, or sponsored by:**
+- Ink (blockchain network operators)
+- Metamask, Kraken, other blockchain entities (company or wallet developers)
+- Any other third-party services or trademarks mentioned in this repository
+
+All trademarks, service marks, and company names are the property of their respective owners. This application is provided "as is" for educational and experimental purposes only. **Use at your own risk.**
 
 ## How to build Smart Contract
 Use Foundry to interact with Ethereum network (L1/L2).

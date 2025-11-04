@@ -95,8 +95,6 @@
   shell: |
     swapoff -a
     sed -i '/ swap / s/^/#/' /etc/fstab
-  args:
-    warn: false
 
 - name: Load required kernel modules
   modprobe:

@@ -8,19 +8,33 @@
 #   3. Get kubeconfig: scp root@YOUR_VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config
 #      Then edit ~/.kube/config and replace 127.0.0.1 with your VM IP for remote access
 
-- name: Setup MotivateMe K3s Cluster
+- name: Install prereqisites
+  hosts: k3s_cluster
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Install Python 3 and dependencies (for Debian/Ubuntu)
+      raw: |
+        apt update -y && apt install -y python3 python3-apt python3-six
+      changed_when: false
+      tags: 
+        - prereq
+
+    - name: Ensure Python 3 path is known
+      set_fact:
+        ansible_python_interpreter: /usr/bin/python3
+      tags: 
+        - prereq
+
+    - name: Gather facts after Python is installed
+      setup:
+
+
+- name: Configure OS and K3S
   hosts: k3s_cluster
   become: yes
   gather_facts: yes
-
-  pre_tasks:
-    - name: Wait for system to be ready
-      wait_for_connection:
-        timeout: 300
-
-    - name: Gather system facts
-      setup:
-
   roles:
     - common
     - k3s

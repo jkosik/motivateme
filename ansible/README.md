@@ -25,15 +25,6 @@ scp root@YOUR_VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config
 kubectl get nodes
 ```
 
-## Test Ingress
-
-```bash
-# On the VM
-kubectl apply -f test-k8s-deployment.yaml
-kubectl get pods -n test-app
-kubectl get ingress -n test-app
-```
-
 ## Troubleshooting on VM
 
 ```bash

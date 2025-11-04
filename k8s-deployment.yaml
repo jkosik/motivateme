@@ -1,0 +1,109 @@
+---
+# Namespace for MotivateMe application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: motivateme
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: motivateme
+  namespace: motivateme
+  labels:
+    app: motivateme
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: motivateme
+  template:
+    metadata:
+      labels:
+        app: motivateme
+    spec:
+      containers:
+      - name: motivateme
+        image: ghcr.io/jkosik/motivateme:latest  # Use specific version tag (e.g., :1.0.0) for production
+        imagePullPolicy: Always  # Always pull latest image
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: motivateme
+  namespace: motivateme
+  labels:
+    app: motivateme
+spec:
+  type: ClusterIP
+  selector:
+    app: motivateme
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+
+---
+# Ingress with Traefik (K3s default)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: motivateme
+  namespace: motivateme
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # If using cert-manager
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+  - hosts:
+    - motivateme.yourdomain.com  # Replace with your domain
+    secretName: motivateme-tls
+  rules:
+  - host: motivateme.yourdomain.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: motivateme
+            port:
+              number: 80
+

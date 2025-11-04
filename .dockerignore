@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+npm-debug.log
+.npm
+
+# Build artifacts
+app/dist
+dist
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+!app/src/*.md
+
+# Ansible
+ansible/
+
+# Contract development
+contract-foundry/
+
+# Testing
+*.log
+

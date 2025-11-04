@@ -9,6 +9,7 @@ window.initializeApp = async function(config) {
   // State
   let provider, signer, contract, modal;
   let currentContractAddress = CONTRACT_ADDRESS;
+  let isProcessingTransaction = false; // Flag to prevent duplicate submissions
 
   const $ = (id) => document.getElementById(id);
 
@@ -534,7 +535,14 @@ window.initializeApp = async function(config) {
 
   // MotivateMe button - triggers the selected action with validation
   $('motivateBtn').onclick = async () => {
+    const btn = $('motivateBtn');
     const val = $('functionSelect').value;
+
+    // CRITICAL: Check if already processing (prevents ALL duplicate submissions)
+    if (isProcessingTransaction) {
+      console.log('⚠️ Transaction already in progress, ignoring click');
+      return;
+    }
 
     if (!val) {
       setFunctionInfo('❌ Please select a motivation first');
@@ -546,17 +554,33 @@ window.initializeApp = async function(config) {
       return;
     }
 
-    // Log all contract events first
-    console.log('🔍 Reading contract event history...');
-    await logContractEvents();
+    // Set flag and disable button IMMEDIATELY
+    isProcessingTransaction = true;
+    btn.disabled = true;
+    console.log('🔒 Transaction processing locked');
 
-    // Call the appropriate function based on selection
-    if (val === 'instantMotivation') {
-      await sendInstantMotivation();
-    } else if (val === 'timelockedMotivation') {
-      await sendTimelockedMotivation();
-    } else if (val === 'proofOfActionMotivation') {
-      await sendProofOfActionMotivation();
+    try {
+      // Log all contract events first
+      console.log('🔍 Reading contract event history...');
+      await logContractEvents();
+
+      // Call the appropriate function based on selection
+      if (val === 'instantMotivation') {
+        await sendInstantMotivation();
+      } else if (val === 'timelockedMotivation') {
+        await sendTimelockedMotivation();
+      } else if (val === 'proofOfActionMotivation') {
+        await sendProofOfActionMotivation();
+      }
+
+      // Note: Button re-enabled by individual send functions after success/error
+      // Flag cleared there too
+    } catch (error) {
+      console.error('Motivation error:', error);
+      setFunctionInfo(`❌ Error: ${error.message || 'Failed'}`);
+      btn.disabled = false;
+      isProcessingTransaction = false;
+      console.log('🔓 Transaction lock released (error)');
     }
   };
 
@@ -635,6 +659,8 @@ window.initializeApp = async function(config) {
       setTimeout(() => {
         btn.textContent = originalText;
         btn.disabled = false;
+        isProcessingTransaction = false;
+        console.log('🔓 Transaction lock released (success)');
         clearForm();
       }, 2000);
     } catch (e) {
@@ -673,6 +699,8 @@ window.initializeApp = async function(config) {
 
       btn.textContent = originalText;
       btn.disabled = false;
+      isProcessingTransaction = false;
+      console.log('🔓 Transaction lock released (error)');
       setFunctionInfo(`❌ Error: ${errorMsg}`);
     }
   }
@@ -719,6 +747,8 @@ window.initializeApp = async function(config) {
       setTimeout(() => {
         btn.textContent = originalText;
         btn.disabled = false;
+        isProcessingTransaction = false;
+        console.log('🔓 Transaction lock released (success)');
         clearForm();
       }, 2000);
     } catch (e) {
@@ -805,6 +835,8 @@ window.initializeApp = async function(config) {
       setTimeout(() => {
         btn.textContent = originalText;
         btn.disabled = false;
+        isProcessingTransaction = false;
+        console.log('🔓 Transaction lock released (success)');
         clearForm();
       }, 2000);
     } catch (e) {
@@ -843,6 +875,8 @@ window.initializeApp = async function(config) {
 
       btn.textContent = originalText;
       btn.disabled = false;
+      isProcessingTransaction = false;
+      console.log('🔓 Transaction lock released (error)');
       setFunctionInfo(`❌ Error: ${errorMsg}`);
     }
   }
@@ -1014,7 +1048,7 @@ window.initializeApp = async function(config) {
         } else if (claim.type === 'proofOfAction') {
           html += `<div class="claim-card-detail">📋 Action: "${claim.actionRequired}"</div>`;
           html += `<div class="claim-card-status status-ready">✅ Ready to claim (provide proof)</div>`;
-          html += `<textarea id="proof-${index}" class="proof-input" placeholder="Describe what you did (e.g., Twitter link or description)..." rows="3"></textarea>`;
+          html += `<textarea id="proof-${index}" class="proof-input" placeholder="Describe what you have executed to meet the goal. Blockchain will store and remember it..." rows="3"></textarea>`;
           html += `<div id="claim-message-${index}" style="margin-top: 8px; font-size: 14px; text-align: center;"></div>`;
           html += `<button class="claim-btn" onclick="window.claimProofOfAction('${claim.sender}', ${claim.index}, ${index})">Submit Proof & Claim</button>`;
         }
@@ -1055,18 +1089,41 @@ window.initializeApp = async function(config) {
       messageDiv.textContent = `✅ Time-locked motivation claimed in block ${receipt.blockNumber}`;
       messageDiv.style.color = '#000'; // Black text (checkbox is naturally green)
 
-      // Wait 20 seconds before reloading claims (user can close modal anytime)
+      // Wait 10 seconds before reloading claims (user can close modal anytime)
       setTimeout(() => {
         btn.disabled = false;
         messageDiv.textContent = '';
         loadClaimableMotivations();
-      }, 20000);
+      }, 10000);
     } catch (error) {
       console.error('Claim error:', error);
-      btn.disabled = false;
-      btn.textContent = originalText;
-      messageDiv.textContent = '';
-      alert(`Error: ${error.message || 'Claim failed'}`);
+
+      // Show error message
+      let errorMsg = error.message || 'Claim failed';
+
+      // Check for common errors
+      if (errorMsg.includes('Already claimed')) {
+        errorMsg = 'Already claimed (refreshing...)';
+      } else if (errorMsg.includes('still locked')) {
+        errorMsg = 'Still locked - check unlock date';
+      } else if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+        errorMsg = 'You cancelled the transaction';
+      } else if (error.code === 'ACTION_REJECTED') {
+        errorMsg = 'You cancelled the transaction';
+      } else if (errorMsg === '' || errorMsg.includes('could not coalesce')) {
+        errorMsg = 'Transaction error - checking status...';
+      }
+
+      messageDiv.textContent = `❌ ${errorMsg}`;
+      messageDiv.style.color = 'red';
+
+      // ALWAYS reload claims after 2 seconds to show actual state
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        messageDiv.textContent = '';
+        loadClaimableMotivations();
+      }, 2000);
     }
   };
 
@@ -1104,18 +1161,39 @@ window.initializeApp = async function(config) {
       messageDiv.textContent = `✅ Proof-of-action motivation claimed in block ${receipt.blockNumber}`;
       messageDiv.style.color = '#000'; // Black text (checkbox is naturally green)
 
-      // Wait 20 seconds before reloading claims (user can close modal anytime)
+      // Wait 10 seconds before reloading claims (user can close modal anytime)
       setTimeout(() => {
         btn.disabled = false;
         messageDiv.textContent = '';
         loadClaimableMotivations();
-      }, 20000);
+      }, 10000);
     } catch (error) {
       console.error('Claim error:', error);
-      btn.disabled = false;
-      btn.textContent = originalText;
-      messageDiv.textContent = '';
-      alert(`Error: ${error.message || 'Claim failed'}`);
+
+      // Show error message
+      let errorMsg = error.message || 'Claim failed';
+
+      // Check for common errors
+      if (errorMsg.includes('Already claimed')) {
+        errorMsg = 'Already claimed (refreshing...)';
+      } else if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+        errorMsg = 'You cancelled the transaction';
+      } else if (error.code === 'ACTION_REJECTED') {
+        errorMsg = 'You cancelled the transaction';
+      } else if (errorMsg === '' || errorMsg.includes('could not coalesce')) {
+        errorMsg = 'Transaction error - checking status...';
+      }
+
+      messageDiv.textContent = `❌ ${errorMsg}`;
+      messageDiv.style.color = 'red';
+
+      // ALWAYS reload claims after 2 seconds to show actual state
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        messageDiv.textContent = '';
+        loadClaimableMotivations();
+      }, 2000);
     }
   };
 

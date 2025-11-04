@@ -1,83 +1,124 @@
 # K3s Deployment with Ansible
 
-Automated K3s deployment on Ubuntu 24.04 for Hetzner VMs with security hardening.
+Automated K3s deployment using the official [k3s-ansible collection](https://github.com/k3s-io/k3s-ansible) with custom security hardening for production use on Ubuntu 24.04.
 
-## Quick Start
+## Install
 ```bash
-ansible all -i inventory/hosts.yml -m ping
-
+cd ansible/
+ansible-galaxy collection install -r requirements.yml
 ansible-playbook -i inventory/hosts.yml playbook.yml
-
-ansible all -i inventory/hosts.yml -a "kubectl get nodes"
-ansible all -i inventory/hosts.yml -a "systemctl status k3s"
 ```
 
-## Access K3s
+## Troubleshooting
 
-### From local machine (SSH tunnel)
-
-```bash
-# Terminal 1: Create tunnel
-ssh -L 6443:127.0.0.1:6443 root@YOUR_VM_IP
-
-# Terminal 2: Download kubeconfig and use kubectl
-scp root@YOUR_VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config
-kubectl get nodes
-```
-
-## Troubleshooting on VM
+### Check K3s Status
 
 ```bash
-sudo ufw status verbose
+ssh root@YOUR_VM_IP
+
+# Service status
 systemctl status k3s
+
+# Logs
 journalctl -u k3s -f
-kubectl get nodes -o wide
-kubectl get pods -A
 ```
 
-### Check API Bind Address
+### Verify API Security
 
 ```bash
-# Verify K3s API is bound to localhost only
+# Verify API is bound to localhost only
 ss -tlnp | grep 6443
-# Should show: 127.0.0.1:6443
+# Should show: 127.0.0.1:6443 (not 0.0.0.0:6443)
 
 # Test external access (should fail)
 curl -k https://YOUR_VM_IP:6443
-# Connection refused or timeout = good (blocked by firewall)
+# Connection refused or timeout = good (blocked by UFW)
 ```
 
-### View Logs
+### Check Firewall
 
 ```bash
-# K3s logs
-journalctl -u k3s -f
+# UFW status
+sudo ufw status verbose
 
-# Specific pod logs
-kubectl logs -n kube-system POD_NAME
-
-# Ingress logs
-kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50
+# Should show:
+# - 22/tcp ALLOW
+# - 80/tcp ALLOW
+# - 443/tcp ALLOW
+# - 6443/tcp DENY
+# - 10250/tcp DENY
 ```
 
-### Reset K3s (if needed)
+### View Traefik Ingress
+
+```bash
+# Traefik service
+kubectl get svc -n kube-system traefik
+
+# Traefik pods
+kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik
+
+# Traefik logs
+kubectl logs -n kube-system -l app.kubernetes.io/name=traefik --tail=50 -f
+```
+
+### Reset K3s (Nuclear Option)
 
 ```bash
 # WARNING: Deletes everything!
+ssh root@YOUR_VM_IP
 /usr/local/bin/k3s-uninstall.sh
 
-# Then re-run Ansible
+# Then re-deploy
 ansible-playbook -i inventory/hosts.yml playbook.yml
 ```
 
-### Allow Your IP to Access K3s API (optional)
+## Advanced Configuration
 
-```bash
-# On the VM
-sudo ufw allow from YOUR_IP to any port 6443 proto tcp
+### Disable Traefik (Use Different Ingress)
 
-# Then on local machine, edit kubeconfig
-# Replace: server: https://127.0.0.1:6443
-# With:    server: https://YOUR_VM_IP:6443
+Edit `inventory/hosts.yml`:
+
+```yaml
+extra_server_args: >-
+  --bind-address=127.0.0.1
+  --disable=traefik
 ```
 
+Then install your preferred ingress controller (nginx, etc.).
+
+### High Availability (HA) Setup
+
+For multi-server HA with embedded etcd, add more servers to inventory:
+
+```yaml
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        server1:
+          ansible_host: IP1
+        server2:
+          ansible_host: IP2
+        server3:
+          ansible_host: IP3  # Odd number required (3, 5, 7)
+```
+
+k3s-ansible will automatically configure HA mode.
+
+### Add Worker Nodes
+
+```yaml
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        server1:
+          ansible_host: SERVER_IP
+    agent:
+      hosts:
+        worker1:
+          ansible_host: WORKER_IP1
+        worker2:
+          ansible_host: WORKER_IP2
+```

@@ -1,12 +1,15 @@
 ---
-# Namespace for MotivateMe application
+# Kubernetes manifests for MotivateMe dApp
+# Deploy with: kubectl apply -f k8s-deployment.yaml
+
 apiVersion: v1
 kind: Namespace
 metadata:
   name: motivateme
+  labels:
+    name: motivateme
 
 ---
-# Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,7 +63,6 @@ spec:
           failureThreshold: 3
 
 ---
-# Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -79,24 +81,26 @@ spec:
     name: http
 
 ---
-# Ingress with Traefik (K3s default)
+# Ingress for Traefik (K3s default ingress controller)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: motivateme
   namespace: motivateme
   annotations:
-    kubernetes.io/ingress.class: traefik
-    cert-manager.io/cluster-issuer: letsencrypt-prod  # If using cert-manager
+    # Traefik specific annotations
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
+    # Optional: cert-manager for automatic TLS
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
+  ingressClassName: traefik
   tls:
   - hosts:
-    - motivateme.yourdomain.com  # Replace with your domain
+    - motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
     secretName: motivateme-tls
   rules:
-  - host: motivateme.yourdomain.com  # Replace with your domain
+  - host: motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
     http:
       paths:
       - path: /

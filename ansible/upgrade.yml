@@ -1,0 +1,46 @@
+---
+# K3s Upgrade Playbook
+# Uses official k3s-ansible collection
+#
+# Usage:
+#   1. Update k3s_version in inventory/hosts.yml (e.g., v1.31.4+k3s1)
+#   2. Run: ansible-playbook -i inventory/hosts.yml upgrade.yml
+#
+# The upgrade is performed in a rolling fashion to minimize downtime
+
+- name: Upgrade K3s cluster
+  ansible.builtin.import_playbook: k3s.orchestration.upgrade
+
+
+- name: Post-upgrade verification
+  hosts: server
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Wait for K3s to be ready after upgrade
+      command: k3s kubectl get nodes
+      register: k3s_nodes
+      until: k3s_nodes.rc == 0
+      retries: 10
+      delay: 6
+      changed_when: false
+
+    - name: Check K3s version
+      command: k3s --version
+      register: k3s_version_output
+      changed_when: false
+
+    - name: Display upgrade results
+      debug:
+        msg:
+          - "==================================================================="
+          - "✅ K3s upgrade completed successfully!"
+          - "==================================================================="
+          - "{{ k3s_version_output.stdout }}"
+          - ""
+          - "🧪 VERIFY:"
+          - "  kubectl get nodes"
+          - "  kubectl get pods -A"
+          - "==================================================================="
+

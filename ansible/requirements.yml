@@ -1,0 +1,10 @@
+---
+# Ansible Galaxy requirements
+# Install with: ansible-galaxy collection install -r requirements.yml
+
+collections:
+  # Official K3s Ansible collection
+  - name: https://github.com/k3s-io/k3s-ansible.git
+    type: git
+    version: main  # Use 'main' for latest, or specific tag like 'v2.11.1'
+

@@ -1,59 +1,109 @@
 ---
 # MotivateMe K3s Deployment Playbook
-# Deploys K3s on Ubuntu 24.04 with security hardening for Hetzner VM
+# Uses official k3s-ansible collection with custom security hardening
+#
+# Prerequisites:
+#   1. Install collection: ansible-galaxy collection install -r requirements.yml
+#   2. Edit inventory/hosts.yml and set ansible_host to your VM's public IP
 #
 # Usage:
-#   1. Edit inventory/hosts.yml and set ansible_host to your VM's public IP
-#   2. Run: ansible-playbook -i inventory/hosts.yml playbook.yml
-#   3. Get kubeconfig: scp root@YOUR_VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config
-#      Then edit ~/.kube/config and replace 127.0.0.1 with your VM IP for remote access
+#   ansible-playbook -i inventory/hosts.yml playbook.yml
+#
+# Upgrade K3s:
+#   1. Update k3s_version in inventory/hosts.yml
+#   2. Run: ansible-playbook -i inventory/hosts.yml upgrade.yml
 
-- name: Install prereqisites
+- name: Install prerequisites
   hosts: k3s_cluster
-  become: yes
-  gather_facts: no
+  become: true
+  gather_facts: false
 
   tasks:
     - name: Install Python 3 and dependencies (for Debian/Ubuntu)
       raw: |
         apt update -y && apt install -y python3 python3-apt python3-six
       changed_when: false
-      tags: 
+      tags:
         - prereq
 
     - name: Ensure Python 3 path is known
       set_fact:
         ansible_python_interpreter: /usr/bin/python3
-      tags: 
+      tags:
         - prereq
 
     - name: Gather facts after Python is installed
       setup:
 
 
-- name: Configure OS and K3S
-  hosts: k3s_cluster
-  become: yes
-  gather_facts: yes
+- name: System hardening (before K3s)
+  hosts: hardening
+  become: true
+  gather_facts: true
+
   roles:
     - common
-    - k3s
 
-  post_tasks:
+  tags:
+    - hardening
+
+
+# Official k3s-ansible collection deployment
+- name: Deploy K3s cluster
+  ansible.builtin.import_playbook: k3s.orchestration.site
+
+
+- name: Post-installation tasks
+  hosts: server
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Wait for K3s to be ready
+      command: k3s kubectl get nodes
+      register: k3s_nodes
+      until: k3s_nodes.rc == 0
+      retries: 10
+      delay: 6
+      changed_when: false
+
     - name: Display K3s access information
       debug:
         msg:
           - "==================================================================="
-          - "K3s cluster setup complete!"
+          - "✅ K3s cluster deployed successfully!"
           - "==================================================================="
           - "Hostname: {{ target_hostname }}"
-          - "K3s API: Accessible only from localhost (127.0.0.1:6443)"
-          - "K3s Ingress: Accessible externally on ports 80/443"
+          - "K3s Version: {{ k3s_version }}"
           - ""
-          - "To access K3s from your local machine:"
-          - "  scp root@{{ ansible_host }}:/etc/rancher/k3s/k3s.yaml ~/.kube/config"
-          - "  # Edit ~/.kube/config and replace 127.0.0.1 with {{ ansible_host }}"
+          - "🔒 SECURITY:"
+          - "  • K3s API: Accessible ONLY from localhost (127.0.0.1:6443)"
+          - "  • Traefik Ingress: Accessible externally on ports 80/443"
+          - "  • UFW Firewall: Enabled (allows SSH, HTTP, HTTPS)"
+          - "  • Kubelet metrics: Blocked from external access"
           - ""
-          - "Test ingress: kubectl get svc -n kube-system traefik"
+          - "📋 ACCESS FROM YOUR LOCAL MACHINE:"
+          - "  # Copy kubeconfig (replace VM_IP with {{ ansible_host }})"
+          - "  scp root@VM_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config"
+          - ""
+          - "  # Edit ~/.kube/config and change:"
+          - "  server: https://127.0.0.1:6443"
+          - "  to:"
+          - "  server: https://{{ ansible_host }}:6443"
+          - ""
+          - "  # Or use SSH tunnel (more secure):"
+          - "  ssh -L 6443:127.0.0.1:6443 root@{{ ansible_host }}"
+          - "  # Keep connection open, then kubectl will work locally"
+          - ""
+          - "🧪 TEST COMMANDS:"
+          - "  kubectl get nodes"
+          - "  kubectl get pods -A"
+          - "  kubectl get svc -n kube-system traefik"
+          - ""
+          - "📦 DEPLOY YOUR APP:"
+          - "  kubectl apply -f ../k8s-deployment.yaml"
           - "==================================================================="
+
+  tags:
+    - info
 

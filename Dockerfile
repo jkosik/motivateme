@@ -23,7 +23,7 @@ FROM golang:1.21-alpine AS backend-builder
 WORKDIR /build
 
 # Copy go.mod if it exists, otherwise we'll use go mod init
-COPY app/src/go.* ./src/ 2>/dev/null || true
+COPY app/src/go.* ./src/ 
 
 # Copy Go source
 COPY app/src/*.go ./src/

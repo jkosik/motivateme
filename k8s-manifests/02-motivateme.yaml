@@ -104,10 +104,10 @@ spec:
   ingressClassName: traefik
   tls:
   - hosts:
-    - motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
+    - motivateme.ink
     secretName: motivateme-tls  # cert-manager will create this secret automatically
   rules:
-  - host: motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
+  - host: motivateme.ink
     http:
       paths:
       - path: /

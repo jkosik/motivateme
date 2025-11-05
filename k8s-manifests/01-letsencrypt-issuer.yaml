@@ -1,14 +1,4 @@
 ---
-# Let's Encrypt ClusterIssuers for cert-manager
-# These create certificate issuers for the entire cluster
-#
-# Prerequisites:
-#   1. cert-manager must be installed (see 00-cert-manager.yaml)
-#   2. Update email address below with your actual email
-#
-# Usage:
-#   kubectl apply -f 01-letsencrypt-issuer.yaml
-
 # Let's Encrypt STAGING issuer (for testing)
 # Use this first to test your setup without hitting rate limits
 apiVersion: cert-manager.io/v1
@@ -20,8 +10,7 @@ spec:
     # Let's Encrypt staging server (for testing)
     server: https://acme-staging-v02.api.letsencrypt.org/directory
 
-    # ⚠️ CHANGE THIS: Your email for Let's Encrypt notifications
-    email: your-email@example.com
+    email: 3286033+jkosik@users.noreply.github.com
 
     # Secret to store ACME account private key
     privateKeySecretRef:
@@ -45,8 +34,7 @@ spec:
     # Let's Encrypt production server
     server: https://acme-v02.api.letsencrypt.org/directory
 
-    # ⚠️ CHANGE THIS: Your email for Let's Encrypt notifications
-    email: your-email@example.com
+    email: 3286033+jkosik@users.noreply.github.com
 
     # Secret to store ACME account private key
     privateKeySecretRef:
@@ -57,4 +45,3 @@ spec:
     - http01:
         ingress:
           class: traefik
-

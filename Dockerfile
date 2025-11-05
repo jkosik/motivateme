@@ -8,8 +8,12 @@ WORKDIR /app
 # Copy package files
 COPY app/package*.json ./
 
-# Install dependencies
-RUN npm install --only=production
+# First install all dependencies (including dev) to build
+RUN npm install
+# Build frontend
+RUN npm run build
+# Then prune to production dependencies
+RUN npm prune --production
 
 # Copy source files and config
 COPY app/vite.config.js ./

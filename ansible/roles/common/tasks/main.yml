@@ -39,15 +39,6 @@
     enabled: no
   ignore_errors: yes
 
-- name: Set default iptables policies
-  iptables:
-    chain: "{{ item.chain }}"
-    policy: "{{ item.policy }}"
-  loop:
-    - { chain: 'INPUT', policy: 'DROP' }
-    - { chain: 'FORWARD', policy: 'DROP' }
-    - { chain: 'OUTPUT', policy: 'ACCEPT' }
-
 - name: Allow loopback
   iptables:
     chain: INPUT
@@ -67,6 +58,15 @@
     destination_port: '22'
     jump: ACCEPT
     comment: SSH
+
+- name: Set default iptables policies (after allowing SSH)
+  iptables:
+    chain: "{{ item.chain }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { chain: 'INPUT', policy: 'DROP' }
+    - { chain: 'FORWARD', policy: 'DROP' }
+    - { chain: 'OUTPUT', policy: 'ACCEPT' }
 
 - name: Allow HTTP (port 80)
   iptables:

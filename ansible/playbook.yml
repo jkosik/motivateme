@@ -53,6 +53,37 @@
   ansible.builtin.import_playbook: k3s.orchestration.site
 
 
+- name: Copy deployment manifests to server
+  hosts: server
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Create /data directory
+      file:
+        path: /data
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Copy k8s-manifests to /data
+      copy:
+        src: ../k8s-manifests/
+        dest: /data/k8s-manifests/
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Make scripts executable
+      file:
+        path: /data/k8s-manifests/check-cert.sh
+        mode: '0755'
+
+  tags:
+    - manifests
+
+
 - name: Post-installation tasks
   hosts: server
   become: true
@@ -97,11 +128,9 @@
           - ""
           - "🧪 TEST COMMANDS:"
           - "  kubectl get nodes"
-          - "  kubectl get pods -A"
-          - "  kubectl get svc -n kube-system traefik"
           - ""
           - "📦 DEPLOY YOUR APP:"
-          - "  kubectl apply -f ../k8s-deployment.yaml"
+          - "  See k8s-manifests/README.md for more details"
           - "==================================================================="
 
   tags:

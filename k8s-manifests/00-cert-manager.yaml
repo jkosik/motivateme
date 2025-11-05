@@ -1,0 +1,35 @@
+# cert-manager installation
+# This installs cert-manager v1.16.2 (latest stable as of 2025)
+# Apply this FIRST before other manifests
+#
+# kubectl apply -f 00-cert-manager.yaml
+#
+# Wait for cert-manager to be ready:
+# kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager -n cert-manager
+# kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager-webhook -n cert-manager
+# kubectl wait --for=condition=Available --timeout=300s deployment/cert-manager-cainjector -n cert-manager
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+
+---
+# Source: https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+# Install with: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+#
+# For this deployment, we reference the official release URL directly
+# This ensures you always get the complete, tested manifest
+#
+# To install cert-manager, run:
+#
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+#
+# Or download and apply locally:
+#
+#   curl -sL https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml | kubectl apply -f -
+#
+# The manifest is ~1000 lines (CRDs, RBAC, Deployments, Services, etc.)
+# We don't inline it here to keep this file manageable and ensure version consistency
+

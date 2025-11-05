@@ -82,23 +82,30 @@ spec:
 
 ---
 # Ingress for Traefik (K3s default ingress controller)
+# With cert-manager for automatic Let's Encrypt TLS certificates
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: motivateme
   namespace: motivateme
   annotations:
-    # Traefik specific annotations
+    # Traefik configuration
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    # Optional: cert-manager for automatic TLS
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    # cert-manager: Automatic Let's Encrypt certificate
+    # Use letsencrypt-staging first to test, then switch to letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    # Optional: Force HTTP to HTTPS redirect
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+    traefik.ingress.kubernetes.io/redirect-permanent: "true"
 spec:
   ingressClassName: traefik
   tls:
   - hosts:
     - motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
-    secretName: motivateme-tls
+    secretName: motivateme-tls  # cert-manager will create this secret automatically
   rules:
   - host: motivateme.yourdomain.com  # ⚠️ CHANGE THIS to your actual domain
     http:

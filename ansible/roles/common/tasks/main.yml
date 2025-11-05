@@ -26,111 +26,101 @@
       - git
       - curl
       - wget
-      - ufw
+      - iptables-persistent
       - ca-certificates
       - apt-transport-https
       - software-properties-common
     state: present
 
-- name: Ensure UFW is installed and enabled
-  service:
+- name: Disable and stop UFW (if installed)
+  systemd:
     name: ufw
-    state: started
-    enabled: yes
+    state: stopped
+    enabled: no
+  ignore_errors: yes
 
-- name: Enable IPv6 in UFW
-  lineinfile:
-    path: /etc/default/ufw
-    regexp: '^IPV6='
-    line: 'IPV6=yes'
-    state: present
+- name: Set default iptables policies
+  iptables:
+    chain: "{{ item.chain }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { chain: 'INPUT', policy: 'DROP' }
+    - { chain: 'FORWARD', policy: 'DROP' }
+    - { chain: 'OUTPUT', policy: 'ACCEPT' }
 
-- name: Configure UFW - Default deny incoming
-  ufw:
-    state: enabled
-    policy: deny
-    direction: incoming
+- name: Allow loopback
+  iptables:
+    chain: INPUT
+    in_interface: lo
+    jump: ACCEPT
 
-- name: Configure UFW - Default allow outgoing
-  ufw:
-    state: enabled
-    policy: allow
-    direction: outgoing
+- name: Allow established connections
+  iptables:
+    chain: INPUT
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
 
-- name: Allow SSH through firewall
-  ufw:
-    rule: allow
-    port: '22'
-    proto: tcp
-    comment: 'SSH for remote management'
+- name: Allow SSH (port 22)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: '22'
+    jump: ACCEPT
+    comment: SSH
 
-- name: Allow HTTP through firewall
-  ufw:
-    rule: allow
-    port: '80'
-    proto: tcp
-    comment: 'HTTP for K3s Ingress'
+- name: Allow HTTP (port 80)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: '80'
+    jump: ACCEPT
+    comment: HTTP
 
-- name: Allow HTTPS through firewall
-  ufw:
-    rule: allow
-    port: '443'
-    proto: tcp
-    comment: 'HTTPS for K3s Ingress'
-
-- name: Allow K3s API from localhost
-  ufw:
-    rule: allow
-    port: '6443'
-    proto: tcp
-    from_ip: '127.0.0.1'
-    comment: 'Allow K3s API from localhost'
+- name: Allow HTTPS (port 443)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: '443'
+    jump: ACCEPT
+    comment: HTTPS
 
 - name: Allow K3s API from pod network
-  ufw:
-    rule: allow
-    port: '6443'
-    proto: tcp
-    from_ip: '10.42.0.0/16'
-    comment: 'Allow K3s API from pod network'
+  iptables:
+    chain: INPUT
+    source: 10.42.0.0/16
+    protocol: tcp
+    destination_port: '6443'
+    jump: ACCEPT
+    comment: K3s-pods
 
 - name: Allow K3s API from service network
-  ufw:
-    rule: allow
-    port: '6443'
-    proto: tcp
-    from_ip: '10.43.0.0/16'
-    comment: 'Allow K3s API from service network'
+  iptables:
+    chain: INPUT
+    source: 10.43.0.0/16
+    protocol: tcp
+    destination_port: '6443'
+    jump: ACCEPT
+    comment: K3s-svc
 
-- name: Block K3s API from external access
-  ufw:
-    rule: deny
-    port: '6443'
-    proto: tcp
-    from_ip: any
-    comment: 'Block K3s API from external access'
+- name: Block K3s API from external (explicit DROP)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: '6443'
+    jump: DROP
+    comment: Block-K3s-API
 
-- name: Block K3s metrics port from external access
-  ufw:
-    rule: deny
-    port: '10250'
-    proto: tcp
-    from_ip: any
-    comment: 'Block K3s kubelet metrics'
+- name: Block K3s metrics from external
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: '10250'
+    jump: DROP
+    comment: Block-metrics
 
-- name: Block K3s API on IPv6 from external access
-  community.general.ufw:
-    rule: deny
-    port: '6443'
-    proto: tcp
-    interface_in: any
-    route: no
-    comment: 'Block K3s API on IPv6'
-  when: ansible_default_ipv6 is defined
-
-- name: Enable UFW
-  ufw:
-    state: enabled
+- name: Save iptables rules
+  shell: netfilter-persistent save
+  changed_when: false
 
 - name: Optionally disable IPv6 (for maximum security)
   sysctl:

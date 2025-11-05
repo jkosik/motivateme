@@ -38,6 +38,13 @@
     state: started
     enabled: yes
 
+- name: Enable IPv6 in UFW
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^IPV6='
+    line: 'IPV6=yes'
+    state: present
+
 - name: Configure UFW - Default deny incoming
   ufw:
     state: enabled
@@ -111,9 +118,33 @@
     from_ip: any
     comment: 'Block K3s kubelet metrics'
 
+- name: Block K3s API on IPv6 from external access
+  community.general.ufw:
+    rule: deny
+    port: '6443'
+    proto: tcp
+    interface_in: any
+    route: no
+    comment: 'Block K3s API on IPv6'
+  when: ansible_default_ipv6 is defined
+
 - name: Enable UFW
   ufw:
     state: enabled
+
+- name: Optionally disable IPv6 (for maximum security)
+  sysctl:
+    name: "{{ item }}"
+    value: '1'
+    state: present
+    reload: yes
+  loop:
+    - net.ipv6.conf.all.disable_ipv6
+    - net.ipv6.conf.default.disable_ipv6
+    - net.ipv6.conf.lo.disable_ipv6
+  when: disable_ipv6 | default(false) | bool
+  tags:
+    - ipv6
 
 - name: Disable swap (required for Kubernetes)
   shell: |

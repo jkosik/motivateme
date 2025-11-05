@@ -8,25 +8,21 @@ WORKDIR /app
 # Copy package files
 COPY app/package*.json ./
 
-# First install all dependencies (including dev) to build
+# Install dependencies (including dev dependencies for build)
 RUN npm install
-# Build frontend
-RUN npm run build
-# Then prune to production dependencies
-RUN npm prune --production
 
 # Copy source files and config
 COPY app/vite.config.js ./
-COPY app/src ./src
+COPY app/src/static ./src/static
 
-# Build frontend
+# Build frontend (output to dist/)
 RUN npm run build
 
 
 # -----------------------------------------------------
 # Stage 2: Build Go backend
 # -----------------------------------------------------
-FROM golang:1.24-alpine AS backend-builder
+FROM golang:1.21-alpine AS backend-builder
 
 WORKDIR /build/src
 

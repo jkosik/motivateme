@@ -260,6 +260,41 @@ window.initializeApp = async function(config) {
       let networkName = ACTIVE_NETWORK.chainName;
       if (Number(net.chainId) !== ACTIVE_NETWORK.chainIdDecimal) {
         networkName = `Wrong network (${Number(net.chainId)})`;
+        console.warn(`⚠️ Wrong network detected. Expected ${ACTIVE_NETWORK.chainIdDecimal}, got ${Number(net.chainId)}`);
+
+        // Try to switch network automatically
+        try {
+          console.log('🔄 Requesting network switch...');
+          await provider.send('wallet_switchEthereumChain', [{ chainId: ACTIVE_NETWORK.chainId }]);
+          console.log('✅ Network switched successfully');
+          // Reload to reinitialize with correct network
+          location.reload();
+          return;
+        } catch (switchError) {
+          // If network doesn't exist in wallet, add it
+          if (switchError.code === 4902 || switchError.message?.includes('Unrecognized chain')) {
+            try {
+              console.log('📡 Adding Ink network to wallet...');
+              await provider.send('wallet_addEthereumChain', [{
+                chainId: ACTIVE_NETWORK.chainId,
+                chainName: ACTIVE_NETWORK.chainName,
+                nativeCurrency: ACTIVE_NETWORK.nativeCurrency,
+                rpcUrls: ACTIVE_NETWORK.rpcUrls,
+                blockExplorerUrls: ACTIVE_NETWORK.blockExplorerUrls
+              }]);
+              console.log('✅ Network added and switched');
+              // Reload to reinitialize with correct network
+              location.reload();
+              return;
+            } catch (addError) {
+              console.error('❌ Failed to add network:', addError);
+              setFunctionInfo('⚠️ Please manually switch to Ink network in your wallet');
+            }
+          } else {
+            console.error('❌ Failed to switch network:', switchError);
+            setFunctionInfo('⚠️ Please manually switch to Ink network in your wallet');
+          }
+        }
       }
 
       setWalletInfo(`${acct.slice(0, 6)}...${acct.slice(-4)} · ${networkName}`, true);

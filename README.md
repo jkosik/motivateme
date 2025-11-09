@@ -15,7 +15,7 @@ All trademarks, service marks, and company names are the property of their respe
 Use Foundry to interact with Ethereum network (L1/L2).
 Foundry contains:
 - `forge` - deploys smart contracts
-- `cast` - CLI for interatciton with blockchain/nodes/contracts
+- `cast` - CLI for interactiton with blockchain/nodes/contracts
 - `anvil` - local Ethereum node
 - `chisel` - Solidity playground
 
@@ -190,3 +190,4 @@ On Ink L2, gas is always paid in ETH. Any ERC-20 (Ethereum-compatible) token can
 - Oracle integration
 - can we see events and messages in etherscan? or ink explorer?
 - makefile?
+- more responsive design for mobile.

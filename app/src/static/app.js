@@ -1046,7 +1046,10 @@ window.initializeApp = async function(config) {
             html += `<button class="claim-btn" disabled>Claim</button>`;
           }
         } else if (claim.type === 'proofOfAction') {
-          html += `<div class="claim-card-detail">📋 Action: "${claim.actionRequired}"</div>`;
+          html += `<div class="claim-card-detail">📋 Action Required: "${claim.actionRequired}"</div>`;
+          if (claim.message) {
+            html += `<div class="claim-card-detail" style="margin-top: 4px;">💬 Sender's Note: "${claim.message}"</div>`;
+          }
           html += `<div class="claim-card-status status-ready">✅ Ready to claim (provide proof)</div>`;
           html += `<textarea id="proof-${index}" class="proof-input" placeholder="Describe what you have executed to meet the goal. Blockchain will store and remember it..." rows="3"></textarea>`;
           html += `<div id="claim-message-${index}" style="margin-top: 8px; font-size: 14px; text-align: center;"></div>`;

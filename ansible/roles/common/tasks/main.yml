@@ -14,6 +14,14 @@
     state: present
   when: target_hostname is defined
 
+- name: Create ansible tmp directory with correct permissions
+  file:
+    path: /root/.ansible/tmp
+    state: directory
+    mode: '0700'
+    owner: root
+    group: root
+
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -32,11 +40,24 @@
       - software-properties-common
     state: present
 
-- name: Disable and stop UFW (if installed)
-  systemd:
-    name: ufw
-    state: stopped
-    enabled: no
+- name: Check if UFW is installed
+  command: which ufw
+  register: ufw_check
+  changed_when: false
+  failed_when: false
+
+- name: Ensure UFW is disabled and stopped (if installed)
+  block:
+    - name: Stop UFW service
+      systemd:
+        name: ufw
+        state: stopped
+        masked: yes
+    - name: Disable UFW at boot
+      systemd:
+        name: ufw
+        enabled: no
+  when: ufw_check.rc == 0
   ignore_errors: yes
 
 - name: Allow loopback
@@ -166,4 +187,28 @@
     - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
     - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
     - { name: 'net.ipv4.ip_forward', value: '1' }
+
+- name: Download kubectx
+  get_url:
+    url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx
+    dest: /usr/local/bin/kubectx
+    mode: '0755'
+
+- name: Download kubens
+  get_url:
+    url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubens
+    dest: /usr/local/bin/kubens
+    mode: '0755'
+
+- name: Add kubectl alias to root bashrc
+  lineinfile:
+    path: /root/.bashrc
+    line: 'alias k=kubectl'
+    state: present
+
+- name: Add kubectl completion to root bashrc
+  lineinfile:
+    path: /root/.bashrc
+    line: 'complete -o default -F __start_kubectl k'
+    state: present
 

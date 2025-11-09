@@ -85,10 +85,6 @@ window.initializeApp = async function(config) {
       url: window.location.origin,
       icons: ['https://walletconnect.com/walletconnect-logo.png']
     },
-    featuredWalletIds: [
-      'com.kraken', // Kraken Wallet
-      'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96'  // MetaMask
-    ],
     features: {
       analytics: false
     }

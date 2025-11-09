@@ -430,16 +430,136 @@
     }
 
     @media (max-width: 640px) {
+      /* Typography */
       h1 {
         font-size: 28px;
       }
+
+      /* Logo */
+      .logo {
+        width: 80px;
+        height: 80px;
+      }
+
+      /* Layout */
       .row {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
       }
+
       button, select {
         width: 100%;
+      }
+
+      .main-content {
+        padding: 16px;
+      }
+
+      .container {
+        padding: 0;
+      }
+
+      /* Help and Claims panels - full screen overlay on mobile */
+      .page-wrapper.help-open {
+        margin-right: 0;
+      }
+
+      .help-panel {
+        width: 100%;
+        right: -100%;
+        padding: 20px;
+        padding-top: 60px; /* Space for X button */
+        z-index: 1000;
+      }
+
+      .help-panel.open {
+        right: 0;
+      }
+
+      .help-close {
+        top: 16px;
+        right: 16px;
+        font-size: 32px;
+        padding: 8px;
+        z-index: 1001;
+        background: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 4px;
+        width: 44px; /* Minimum touch target */
+        height: 44px; /* Minimum touch target */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .help-panel h3 {
+        font-size: 20px;
+        margin-top: 20px;
+        padding-right: 0; /* No need for padding when X is positioned absolutely */
+      }
+
+      .help-panel h3:first-of-type {
+        margin-top: 0;
+        font-size: 24px;
+      }
+
+      /* Claim cards */
+      .claim-card {
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+
+      .claim-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .claim-card-header button {
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      .claim-card-detail {
+        font-size: 13px;
+        word-break: break-word;
+      }
+
+      /* Proof input on mobile */
+      .proof-input {
+        font-size: 14px;
+      }
+
+      /* Help link */
+      .help-link {
+        font-size: 14px;
+      }
+
+      /* Custom contract section - stack vertically on mobile */
+      #customContractInput > div {
+        flex-direction: column !important;
+        gap: 8px !important;
+      }
+
+      #customContractInput input {
+        width: 100% !important;
+      }
+
+      #customContractInput .apply-btn {
+        width: 100% !important;
+        padding: 10px 16px !important;
+      }
+    }
+
+    /* Tablet adjustments */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      .help-panel {
+        width: 400px;
+        right: -400px;
+      }
+
+      .page-wrapper.help-open {
+        margin-right: 400px;
       }
     }
   </style>
@@ -512,23 +632,22 @@
     <button class="help-close" onclick="document.getElementById('pageWrapper').classList.remove('help-open'); document.getElementById('helpPanel').classList.remove('open')">&times;</button>
 
     <h3>🦥 What is <span style="font-family: 'Rubik Dirt', cursive;">MotivateMe</span>?</h3>
-    <p>MotivateMe is a blockchain dApp (decentralized application) where you can challenge yourself or others by locking cryptocurrency as motivation.
-      Money are released to the recipient only after the challenge is completed. Completion is defined in the Smart Contract.
-      All transactions happen on the <strong><a href="https://inkonchain.com/" target="_blank">Ink network</a></strong>.</p>
+    <p>MotivateMe is a blockchain dApp (decentralized application) where you can motivate (challenge) others by locking cryptocurrency and releasing it only after the challenge is completed.
+      Challenge conditions are managed in the Smart Contract on the <strong><a href="https://inkonchain.com/" target="_blank">Ink blockchain</a></strong>.</p>
 
     <h3>💰 Requirements for Challenger (locks money for the recipient)</h3>
     <ul>
       <li>EVM-compatible wallet (MetaMask, Kraken Wallet, etc.) as browser extension or mobile app.</li>
-      <li><strong>Small fraction of ETH on Ink network</strong> in the wallet to pay for gas fees - equivalent of USD subcents is enough.</li>
-      <li>To fund ETH to Ink network, you can use <a href="https://inkonchain.com/bridge" target="_blank">https://inkonchain.com/bridge</a> or any other bridge.</li>
-      <li>Another easy way for funding is using Kraken Wallet and direct funding from Kraken Exchange account.</li>
+      <li><strong>Small fraction of ETH on Ink network</strong> in the wallet to pay gas fees - equivalent of USD subcents is enough.</li>
+      <li>To fund ETH to Ink network, you can use <a href="https://inkonchain.com/bridge" target="_blank">https://inkonchain.com/bridge</a>.</li>
+      <li>Another easy way for sending ETH to Ink network is using Kraken Wallet and direct funding from Kraken Exchange account.</li>
     </ul>
 
     <h3>🎯 Requirements for Challenged (recipient of the money)</h3>
     <ul>
-      <li>Ethereum-compatible address (0x...) generated by EVM-compatible wallet.</li>
+      <li>Ethereum-compatible wallet address (0x...).</li>
       <li>To see the received funds, recipient must add Ink network to the wallet.</li>
-      <li>Using Kraken wallet, funds can be easily transferred to Kraken exchange for further use or withdrawal.</li>
+      <li>To withdraw the rewards, use <a href="https://inkonchain.com/bridge" target="_blank">https://inkonchain.com/bridge</a> or transfer funds to your Kraken crypto exchange account directly.</li>
     </ul>
 
     <h3>⚠️ Important Notes</h3>

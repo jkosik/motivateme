@@ -186,8 +186,3 @@ https://docs.walletconnect.network/app-sdk/javascript/installation
 ### Tokens and Gas
 On Ink L2, gas is always paid in ETH. Any ERC-20 (Ethereum-compatible) token can be transacted.
 
-## Todo
-- Oracle integration
-- can we see events and messages in etherscan? or ink explorer?
-- makefile?
-- more responsive design for mobile.

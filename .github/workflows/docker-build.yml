@@ -6,7 +6,7 @@ on:
       - main
       - master
     tags:
-      - '*'  # Trigger on any tag
+      - '**'  # Trigger on any tag
 
 env:
   REGISTRY: ghcr.io

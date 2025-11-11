@@ -779,8 +779,10 @@ window.initializeApp = async function(config) {
         console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
         console.warn('💡 This is a known RPC issue - wallet popup should still appear');
 
-        // Keep button disabled but change text to show waiting state
-        btn.textContent = 'Waiting for confirmation...';
+        // Wait 2 seconds before changing button text (give user time to see wallet popup)
+        setTimeout(() => {
+          btn.textContent = 'Waiting for confirmation...';
+        }, 2000);
 
         // Get my address for the event filter
         const myAddress = await signer.getAddress();
@@ -890,8 +892,10 @@ window.initializeApp = async function(config) {
         console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
         console.warn('💡 This is a known RPC issue - wallet popup should still appear');
 
-        // Keep button disabled but change text to show waiting state
-        btn.textContent = 'Waiting for confirmation...';
+        // Wait 2 seconds before changing button text (give user time to see wallet popup)
+        setTimeout(() => {
+          btn.textContent = 'Waiting for confirmation...';
+        }, 2000);
 
         // Get my address for the event filter
         const myAddress = await signer.getAddress();
@@ -1001,8 +1005,10 @@ window.initializeApp = async function(config) {
         console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
         console.warn('💡 This is a known RPC issue - wallet popup should still appear');
 
-        // Keep button disabled but change text to show waiting state
-        btn.textContent = 'Waiting for confirmation...';
+        // Wait 2 seconds before changing button text (give user time to see wallet popup)
+        setTimeout(() => {
+          btn.textContent = 'Waiting for confirmation...';
+        }, 2000);
 
         // Get my address for the event filter
         const myAddress = await signer.getAddress();
@@ -1290,7 +1296,10 @@ window.initializeApp = async function(config) {
         console.warn('⚠️ Ink RPC quirk: Empty error during claim submission');
         console.warn('💡 Wallet popup should still appear - polling for claim success...');
 
-        btn.textContent = 'Waiting for confirmation...';
+        // Wait 2 seconds before changing button text (give user time to see wallet popup)
+        setTimeout(() => {
+          btn.textContent = 'Waiting for confirmation...';
+        }, 2000);
         messageDiv.textContent = '';
 
         // Get my address and start polling for claim event
@@ -1430,7 +1439,10 @@ window.initializeApp = async function(config) {
         console.warn('⚠️ Ink RPC quirk: Empty error during claim submission');
         console.warn('💡 Wallet popup should still appear - polling for claim success...');
 
-        btn.textContent = 'Waiting for confirmation...';
+        // Wait 2 seconds before changing button text (give user time to see wallet popup)
+        setTimeout(() => {
+          btn.textContent = 'Waiting for confirmation...';
+        }, 2000);
         messageDiv.textContent = '';
 
         // Get my address and start polling for claim event

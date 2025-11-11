@@ -661,10 +661,8 @@ window.initializeApp = async function(config) {
       return;
     }
 
-    // Set flag and disable button IMMEDIATELY
-    isProcessingTransaction = true;
-    btn.disabled = true;
-    console.log('🔒 Transaction processing locked');
+    // Don't disable button yet - let validation happen first
+    // Each send function will disable button after validation passes
 
     try {
       // Log all contract events first
@@ -680,8 +678,8 @@ window.initializeApp = async function(config) {
         await sendProofOfActionMotivation();
       }
 
-      // Note: Button re-enabled by individual send functions after success/error
-      // Flag cleared there too
+      // Note: Button disabled/re-enabled by individual send functions
+      // Flag set and cleared there too
     } catch (error) {
       console.error('Motivation error:', error);
       setFunctionInfo(`❌ Error: ${error.message || 'Failed'}`);
@@ -725,27 +723,30 @@ window.initializeApp = async function(config) {
     try {
       const recipient = getRecipientAddress();
       if (!recipient) {
-        return; // Error message already set by getRecipientAddress()
+        return; // Error message already set, button stays active
       }
 
       // Get ETH amount
       const ethAmount = getEthAmount();
       if (!ethAmount) {
-        return; // Error message already set by getEthAmount()
+        return; // Error message already set, button stays active
       }
 
       // Get unlock date for time-locked motivation
       const unlockTimestamp = getUnlockDate();
       if (!unlockTimestamp) {
-        return; // Error message already set by getUnlockDate()
+        return; // Error message already set, button stays active
       }
 
       // Get message (optional)
       const message = getMessage();
 
+      // All validation passed - NOW lock the button and set flag
+      isProcessingTransaction = true;
       btn.disabled = true;
       btn.textContent = 'Confirm in your wallet...';
       setFunctionInfo(''); // Clear any error messages
+      console.log('🔒 Transaction processing locked');
 
       // Call MotivateMe.sol timelockedMotivation function with unlock timestamp and message
       const tx = await contract.timelockedMotivation(recipient, unlockTimestamp, message, { value: ethAmount });
@@ -844,21 +845,24 @@ window.initializeApp = async function(config) {
     try {
       const recipient = getRecipientAddress();
       if (!recipient) {
-        return; // Error message already set by getRecipientAddress()
+        return; // Error message already set, button stays active
       }
 
       // Get ETH amount
       const ethAmount = getEthAmount();
       if (!ethAmount) {
-        return; // Error message already set by getEthAmount()
+        return; // Error message already set, button stays active
       }
 
       // Get message (optional)
       const message = getMessage();
 
+      // All validation passed - NOW lock the button and set flag
+      isProcessingTransaction = true;
       btn.disabled = true;
       btn.textContent = 'Confirm in your wallet...';
       setFunctionInfo(''); // Clear any error messages
+      console.log('🔒 Transaction processing locked');
 
       // Call MotivateMe.sol instantMotivation function (instant transfer) with message
       const tx = await contract.instantMotivation(recipient, message, { value: ethAmount });
@@ -953,25 +957,28 @@ window.initializeApp = async function(config) {
     try {
       const recipient = getRecipientAddress();
       if (!recipient) {
-        return; // Error message already set by getRecipientAddress()
+        return; // Error message already set, button stays active
       }
 
       // Get ETH amount
       const ethAmount = getEthAmount();
       if (!ethAmount) {
-        return; // Error message already set by getEthAmount()
+        return; // Error message already set, button stays active
       }
 
       // Get action required (using message field for proof-of-action)
       const actionRequired = getMessage();
       if (!actionRequired) {
         setFunctionInfo('❌ Please describe the required action');
-        return;
+        return; // Error message set, button stays active
       }
 
+      // All validation passed - NOW lock the button and set flag
+      isProcessingTransaction = true;
       btn.disabled = true;
       btn.textContent = 'Confirm in your wallet...';
       setFunctionInfo(''); // Clear any error messages
+      console.log('🔒 Transaction processing locked');
 
       // Call MotivateMe.sol proofOfActionMotivation function with action required as both parameters
       const tx = await contract.proofOfActionMotivation(recipient, actionRequired, actionRequired, { value: ethAmount });

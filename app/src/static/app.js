@@ -398,6 +398,78 @@ window.initializeApp = async function(config) {
     }
   };
 
+  // Helper function to get safe block range (limit to avoid RPC errors)
+  async function getSafeBlockRange(maxBlocks = 50000) {
+    const currentBlock = await provider.getBlockNumber();
+    const fromBlock = Math.max(0, currentBlock - maxBlocks);
+    return { fromBlock, toBlock: 'latest' };
+  }
+
+  // Helper function to poll for transaction confirmation after RPC quirk
+  async function pollForTransactionSuccess(btn, originalText, eventFilter, successMessage) {
+    console.warn('🔍 Polling for transaction confirmation...');
+
+    // Get current state
+    const startBlock = await provider.getBlockNumber();
+    const myAddress = await signer.getAddress();
+
+    // Poll for new events to detect successful transaction
+    let pollCount = 0;
+    const maxPolls = 60; // 60 polls = 60 seconds
+
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+
+      try {
+        const currentBlock = await provider.getBlockNumber();
+
+        if (currentBlock > startBlock) {
+          console.log(`🔍 Poll ${pollCount}: Checking blocks ${startBlock} to ${currentBlock}...`);
+
+          // Check for new events from my address
+          const newEvents = await contract.queryFilter(
+            eventFilter,
+            startBlock,
+            currentBlock
+          );
+
+          if (newEvents.length > 0) {
+            // Transaction succeeded!
+            clearInterval(pollInterval);
+            const latestEvent = newEvents[newEvents.length - 1];
+
+            btn.textContent = 'Success!';
+            setFunctionInfo(`✅ ${successMessage} in block ${latestEvent.blockNumber}`);
+            console.log('✅ Transaction confirmed via event polling!');
+
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.disabled = false;
+              isProcessingTransaction = false;
+              console.log('🔓 Transaction lock released (success)');
+              clearForm();
+            }, 2000);
+            return;
+          }
+        }
+
+        // Timeout after maxPolls
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          btn.textContent = originalText;
+          btn.disabled = false;
+          isProcessingTransaction = false;
+          console.log('🔓 Transaction lock released (timeout)');
+          clearForm();
+          setFunctionInfo('⏱️ Timed out. If you confirmed, check "My Claims" to verify.');
+          setTimeout(() => setFunctionInfo(''), 10000);
+        }
+      } catch (pollError) {
+        console.warn('Poll error:', pollError);
+      }
+    }, 1000); // Poll every 1 second
+  }
+
   // Function to read and log all contract events
   async function logContractEvents() {
     if (!contract) {
@@ -701,6 +773,29 @@ window.initializeApp = async function(config) {
     } catch (e) {
       console.error('Transaction error (full details):', e);
 
+      // SPECIAL CASE: Ink RPC empty error (transaction submission succeeds despite this error)
+      // This happens during tx submission, but wallet still receives the request
+      if (e.message?.includes('could not coalesce error') && e.error?.message === '') {
+        console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
+        console.warn('💡 This is a known RPC issue - wallet popup should still appear');
+
+        // Keep button disabled but change text to show waiting state
+        btn.textContent = 'Waiting for confirmation...';
+
+        // Get my address for the event filter
+        const myAddress = await signer.getAddress();
+
+        // Start polling for transaction success
+        await pollForTransactionSuccess(
+          btn,
+          originalText,
+          contract.filters.TimelockedMotivationCreated(myAddress),
+          'Time-locked motivation created'
+        );
+
+        return; // Exit without showing error
+      }
+
       // Provide clearer error messages
       let errorMsg = 'Transaction failed';
 
@@ -789,6 +884,29 @@ window.initializeApp = async function(config) {
     } catch (e) {
       console.error('Transaction error (full details):', e);
 
+      // SPECIAL CASE: Ink RPC empty error (transaction submission succeeds despite this error)
+      // This happens during tx submission, but wallet still receives the request
+      if (e.message?.includes('could not coalesce error') && e.error?.message === '') {
+        console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
+        console.warn('💡 This is a known RPC issue - wallet popup should still appear');
+
+        // Keep button disabled but change text to show waiting state
+        btn.textContent = 'Waiting for confirmation...';
+
+        // Get my address for the event filter
+        const myAddress = await signer.getAddress();
+
+        // Start polling for transaction success
+        await pollForTransactionSuccess(
+          btn,
+          originalText,
+          contract.filters.InstantMotivation(myAddress),
+          'Instant motivation sent'
+        );
+
+        return; // Exit without showing error
+      }
+
       // Provide clearer error messages
       let errorMsg = 'Transaction failed';
 
@@ -876,6 +994,29 @@ window.initializeApp = async function(config) {
       }, 2000);
     } catch (e) {
       console.error('Transaction error (full details):', e);
+
+      // SPECIAL CASE: Ink RPC empty error (transaction submission succeeds despite this error)
+      // This happens during tx submission, but wallet still receives the request
+      if (e.message?.includes('could not coalesce error') && e.error?.message === '') {
+        console.warn('⚠️ Ink RPC quirk: Empty error during transaction submission');
+        console.warn('💡 This is a known RPC issue - wallet popup should still appear');
+
+        // Keep button disabled but change text to show waiting state
+        btn.textContent = 'Waiting for confirmation...';
+
+        // Get my address for the event filter
+        const myAddress = await signer.getAddress();
+
+        // Start polling for transaction success
+        await pollForTransactionSuccess(
+          btn,
+          originalText,
+          contract.filters.ProofOfActionMotivationCreated(myAddress),
+          'Proof-of-action motivation created'
+        );
+
+        return; // Exit without showing error
+      }
 
       // Provide clearer error messages
       let errorMsg = 'Transaction failed';
@@ -966,15 +1107,23 @@ window.initializeApp = async function(config) {
       const myAddress = await signer.getAddress();
       const claims = [];
 
+      // Get safe block range to avoid RPC errors (last ~1-2 days of claims)
+      const blockRange = await getSafeBlockRange();
+      console.log(`🔍 Querying claims from block ${blockRange.fromBlock} to latest`);
+
       // Query TimelockedMotivationCreated events where I'm the recipient
       const timelockedEvents = await contract.queryFilter(
-        contract.filters.TimelockedMotivationCreated(null, myAddress)
+        contract.filters.TimelockedMotivationCreated(null, myAddress),
+        blockRange.fromBlock,
+        blockRange.toBlock
       );
       console.log(`🔍 Found ${timelockedEvents.length} time-locked events`);
 
       // Query ProofOfActionMotivationCreated events where I'm the recipient
       const proofOfActionEvents = await contract.queryFilter(
-        contract.filters.ProofOfActionMotivationCreated(null, myAddress)
+        contract.filters.ProofOfActionMotivationCreated(null, myAddress),
+        blockRange.fromBlock,
+        blockRange.toBlock
       );
       console.log(`🔍 Found ${proofOfActionEvents.length} proof-of-action events`);
 
@@ -1136,7 +1285,77 @@ window.initializeApp = async function(config) {
     } catch (error) {
       console.error('Claim error:', error);
 
-      // Show error message
+      // SPECIAL CASE: Ink RPC empty error (claim submission succeeds despite this error)
+      if (error.message?.includes('could not coalesce error') && error.error?.message === '') {
+        console.warn('⚠️ Ink RPC quirk: Empty error during claim submission');
+        console.warn('💡 Wallet popup should still appear - polling for claim success...');
+
+        btn.textContent = 'Waiting for confirmation...';
+        messageDiv.textContent = '';
+
+        // Get my address and start polling for claim event
+        const myAddress = await signer.getAddress();
+        const startBlock = await provider.getBlockNumber();
+
+        let pollCount = 0;
+        const maxPolls = 60; // 60 seconds
+
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+
+          try {
+            const currentBlock = await provider.getBlockNumber();
+
+            if (currentBlock > startBlock) {
+              console.log(`🔍 Poll ${pollCount}: Checking for claim event...`);
+
+              // Check for TimelockedMotivationClaimed event
+              const claimEvents = await contract.queryFilter(
+                contract.filters.TimelockedMotivationClaimed(myAddress, sender),
+                startBlock,
+                currentBlock
+              );
+
+              if (claimEvents.length > 0) {
+                // Claim succeeded!
+                clearInterval(pollInterval);
+                const latestEvent = claimEvents[claimEvents.length - 1];
+
+                btn.textContent = originalText;
+                messageDiv.textContent = `✅ Time-locked motivation claimed in block ${latestEvent.blockNumber}`;
+                messageDiv.style.color = '#000';
+                console.log('✅ Claim confirmed via event polling!');
+
+                setTimeout(() => {
+                  btn.disabled = false;
+                  messageDiv.textContent = '';
+                  loadClaimableMotivations();
+                }, 10000);
+                return;
+              }
+            }
+
+            // Timeout
+            if (pollCount >= maxPolls) {
+              clearInterval(pollInterval);
+              btn.disabled = false;
+              btn.textContent = originalText;
+              messageDiv.textContent = '⏱️ Timed out. Refreshing claims...';
+              messageDiv.style.color = '#666';
+              setTimeout(() => {
+                messageDiv.textContent = '';
+                loadClaimableMotivations();
+              }, 3000);
+            }
+          } catch (pollError) {
+            console.warn('Poll error:', pollError);
+          }
+        }, 1000);
+
+        return; // Exit without showing error
+      }
+
+      // Show error message for real errors
       let errorMsg = error.message || 'Claim failed';
 
       // Check for common errors
@@ -1148,8 +1367,6 @@ window.initializeApp = async function(config) {
         errorMsg = 'You cancelled the transaction';
       } else if (error.code === 'ACTION_REJECTED') {
         errorMsg = 'You cancelled the transaction';
-      } else if (errorMsg === '' || errorMsg.includes('could not coalesce')) {
-        errorMsg = 'Transaction error - checking status...';
       }
 
       messageDiv.textContent = `❌ ${errorMsg}`;
@@ -1208,7 +1425,77 @@ window.initializeApp = async function(config) {
     } catch (error) {
       console.error('Claim error:', error);
 
-      // Show error message
+      // SPECIAL CASE: Ink RPC empty error (claim submission succeeds despite this error)
+      if (error.message?.includes('could not coalesce error') && error.error?.message === '') {
+        console.warn('⚠️ Ink RPC quirk: Empty error during claim submission');
+        console.warn('💡 Wallet popup should still appear - polling for claim success...');
+
+        btn.textContent = 'Waiting for confirmation...';
+        messageDiv.textContent = '';
+
+        // Get my address and start polling for claim event
+        const myAddress = await signer.getAddress();
+        const startBlock = await provider.getBlockNumber();
+
+        let pollCount = 0;
+        const maxPolls = 60; // 60 seconds
+
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+
+          try {
+            const currentBlock = await provider.getBlockNumber();
+
+            if (currentBlock > startBlock) {
+              console.log(`🔍 Poll ${pollCount}: Checking for claim event...`);
+
+              // Check for ProofOfActionClaimed event
+              const claimEvents = await contract.queryFilter(
+                contract.filters.ProofOfActionClaimed(myAddress, sender),
+                startBlock,
+                currentBlock
+              );
+
+              if (claimEvents.length > 0) {
+                // Claim succeeded!
+                clearInterval(pollInterval);
+                const latestEvent = claimEvents[claimEvents.length - 1];
+
+                btn.textContent = originalText;
+                messageDiv.textContent = `✅ Proof-of-action motivation claimed in block ${latestEvent.blockNumber}`;
+                messageDiv.style.color = '#000';
+                console.log('✅ Claim confirmed via event polling!');
+
+                setTimeout(() => {
+                  btn.disabled = false;
+                  messageDiv.textContent = '';
+                  loadClaimableMotivations();
+                }, 10000);
+                return;
+              }
+            }
+
+            // Timeout
+            if (pollCount >= maxPolls) {
+              clearInterval(pollInterval);
+              btn.disabled = false;
+              btn.textContent = originalText;
+              messageDiv.textContent = '⏱️ Timed out. Refreshing claims...';
+              messageDiv.style.color = '#666';
+              setTimeout(() => {
+                messageDiv.textContent = '';
+                loadClaimableMotivations();
+              }, 3000);
+            }
+          } catch (pollError) {
+            console.warn('Poll error:', pollError);
+          }
+        }, 1000);
+
+        return; // Exit without showing error
+      }
+
+      // Show error message for real errors
       let errorMsg = error.message || 'Claim failed';
 
       // Check for common errors
@@ -1218,8 +1505,6 @@ window.initializeApp = async function(config) {
         errorMsg = 'You cancelled the transaction';
       } else if (error.code === 'ACTION_REJECTED') {
         errorMsg = 'You cancelled the transaction';
-      } else if (errorMsg === '' || errorMsg.includes('could not coalesce')) {
-        errorMsg = 'Transaction error - checking status...';
       }
 
       messageDiv.textContent = `❌ ${errorMsg}`;
